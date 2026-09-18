@@ -93,13 +93,6 @@ local function isDoorName(name)
 	return hasDoor and not isNumber
 end
 
-local function isGateName(name)
-	local lower = string.lower(name)
-	return string.find(lower, "rollup", 1, true) ~= nil
-		or string.find(lower, "garage", 1, true) ~= nil
-		or string.find(lower, "overhead", 1, true) ~= nil
-end
-
 local function isDoubleDoorName(name)
 	local lower = string.lower(name)
 	return string.find(lower, "stoordoor", 1, true) ~= nil
@@ -184,6 +177,59 @@ local function getWindowBounds(window)
 	return nil, nil
 end
 
+local windowPassageBusy = {}
+
+local function playWindowPassage(character, root, humanoid, throughDirection, distance)
+	if windowPassageBusy[character] then return end
+	windowPassageBusy[character] = true
+
+	local startCFrame = root.CFrame
+	local startPosition = startCFrame.Position
+	local targetPosition = startPosition + throughDirection * distance
+	local middlePosition = startPosition
+		+ throughDirection * (distance * 0.45)
+		+ Vector3.new(0, 1.6, 0)
+	local rotation = startCFrame.Rotation
+	local wasAnchored = root.Anchored
+	local oldWalkSpeed = humanoid.WalkSpeed
+	local oldAutoRotate = humanoid.AutoRotate
+
+	root.Anchored = true
+	humanoid.WalkSpeed = 0
+	humanoid.AutoRotate = false
+	character:SetAttribute("WindowVaulting", true)
+
+	local driver = Instance.new("CFrameValue")
+	driver.Value = startCFrame
+	driver.Changed:Connect(function(value)
+		if root.Parent then root.CFrame = value end
+	end)
+
+	local first = TweenService:Create(driver, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Value = CFrame.new(middlePosition) * rotation,
+	})
+	local second = TweenService:Create(driver, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Value = CFrame.new(targetPosition) * rotation,
+	})
+
+	first.Completed:Connect(function(state)
+		if state == Enum.PlaybackState.Completed and root.Parent then
+			second:Play()
+		end
+	end)
+	second.Completed:Connect(function()
+		if root.Parent then
+			root.Anchored = wasAnchored
+			humanoid.WalkSpeed = oldWalkSpeed
+			humanoid.AutoRotate = oldAutoRotate
+			character:SetAttribute("WindowVaulting", false)
+		end
+		driver:Destroy()
+		windowPassageBusy[character] = nil
+	end)
+	first:Play()
+end
+
 function MapService.StartWindowPassage()
 	if MapService._windowPassageConnection then return end
 	MapService._windowPassageConnection = RunService.Heartbeat:Connect(function()
@@ -210,7 +256,7 @@ function MapService.StartWindowPassage()
 				local character = player.Character
 				local root = character and character:FindFirstChild("HumanoidRootPart")
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-				if root and humanoid and humanoid.Health > 0 then
+				if root and humanoid and humanoid.Health > 0 and not windowPassageBusy[character] then
 					local localPosition = boxCFrame:PointToObjectSpace(root.Position)
 					local lateral = math.abs(thinOnX and localPosition.Z or localPosition.X)
 					local sideDistance = (root.Position - boxCFrame.Position):Dot(normal)
@@ -223,8 +269,7 @@ function MapService.StartWindowPassage()
 						local throughDirection = sideDistance >= 0 and -normal or normal
 						if movement.Unit:Dot(throughDirection) > 0.2 then
 							local distance = math.abs(sideDistance) + math.min(boxSize.X, boxSize.Z) + 3
-							local target = root.Position + throughDirection * distance
-							root.CFrame = CFrame.new(target) * root.CFrame.Rotation
+							playWindowPassage(character, root, humanoid, throughDirection, distance)
 							break
 						end
 					end
@@ -245,9 +290,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	prompt.Parent = promptParent
 
 	if locked then
-		for _, part in parts do
-			part.CanCollide = true
-		end
+		for _, part in parts do part.CanCollide = true end
 		prompt.Triggered:Connect(function(player)
 			notify(player, "EINGANG VERRIEGELT  ·  FENSTER EINSCHLAGEN", "Info")
 		end)
@@ -273,6 +316,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	local open = false
 	local busy = false
 	local activeOpenAngle = math.rad(-90)
+	local activeRightDirection = Vector3.new(1, 0, 0)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local pivotDriver
 	local doubleDoor = doorObject:IsA("Model") and isDoubleDoorName(doorObject.Name)
@@ -291,9 +335,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 			driver.Parent = prompt
 			driver.Changed:Connect(function(value)
 				for _, item in group do
-					if item.Part.Parent then
-						item.Part.CFrame = value * item.Relative
-					end
+					if item.Part.Parent then item.Part.CFrame = value * item.Relative end
 				end
 			end)
 			doubleDrivers[side] = driver
@@ -318,56 +360,70 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		end
 	end
 
-	local function getOpenAngle(player)
+	local function getOpenDirection(player)
 		local character = player and player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if not root then return math.rad(-90) end
-
-		local playerRight = Vector3.new(root.CFrame.RightVector.X, 0, root.CFrame.RightVector.Z)
-		local doorRight = closedPivot and Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z) or playerRight
-		if playerRight.Magnitude < 0.1 or doorRight.Magnitude < 0.1 then return math.rad(-90) end
-
-		playerRight = playerRight.Unit
-		doorRight = doorRight.Unit
-		if playerRight:Dot(doorRight) >= 0 then
-			return math.rad(-90)
+		local fallback = closedPivot and closedPivot.RightVector or closedParts[parts[1]].RightVector
+		if not root then
+			return Vector3.new(fallback.X, 0, fallback.Z).Unit
 		end
-		return math.rad(90)
+		local right = Vector3.new(root.CFrame.RightVector.X, 0, root.CFrame.RightVector.Z)
+		if right.Magnitude < 0.1 then
+			right = Vector3.new(fallback.X, 0, fallback.Z)
+		end
+		return right.Unit
 	end
 
-	local function playDoor(isOpen, openAngle)
+	local function getOpenAngle(player)
+		local right = getOpenDirection(player)
+		local doorRight = closedPivot and Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z) or right
+		if doorRight.Magnitude < 0.1 then return math.rad(-90) end
+		return right:Dot(doorRight.Unit) >= 0 and math.rad(-90) or math.rad(90)
+	end
+
+	local function makeOpenTarget(cframe, size, rightDirection, angle)
+		local distance = math.max(size.X, size.Z, 3) + 1.5
+		local position = cframe.Position + rightDirection * distance
+		return CFrame.new(position) * cframe.Rotation * CFrame.Angles(0, angle, 0)
+	end
+
+	local function playDoor(isOpen, openAngle, rightDirection)
 		if doubleDoor then
+			local doorRight = Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z)
+			if doorRight.Magnitude < 0.1 then doorRight = Vector3.new(1, 0, 0) end
+			doorRight = doorRight.Unit
+			local size = doorObject:GetExtentsSize()
+			local distance = math.max(size.X, size.Z, 3) + 1.5
+
 			for side, driver in doubleDrivers do
+				local sideSign = side == "left" and -1 or 1
 				local angle = side == "left" and math.rad(90) or math.rad(-90)
-				local target = isOpen and closedPivot * CFrame.Angles(0, angle, 0) or closedPivot
+				local target = closedPivot
+				if isOpen then
+					target = CFrame.new(closedPivot.Position + doorRight * sideSign * distance)
+						* closedPivot.Rotation
+						* CFrame.Angles(0, angle, 0)
+				end
 				TweenService:Create(driver, tweenInfo, { Value = target }):Play()
 			end
 			return
 		end
 
 		if doorObject:IsA("Model") then
-			local target
-			if isGateName(doorObject.Name) then
-				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
-				target = isOpen and closedPivot * CFrame.new(0, height, 0) or closedPivot
-			else
-				target = closedPivot * CFrame.Angles(0, isOpen and (openAngle or activeOpenAngle) or 0, 0)
+			local target = closedPivot
+			if isOpen then
+				target = makeOpenTarget(closedPivot, doorObject:GetExtentsSize(), rightDirection, openAngle)
 			end
 			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
 			return
 		end
 
 		local part = parts[1]
-		local closedCFrame = closedParts[part]
-		local target = closedCFrame
-		if isOpen and isGateName(doorObject.Name) then
-			target = closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
-		elseif isOpen then
-			target = closedCFrame * CFrame.Angles(0, openAngle or activeOpenAngle, 0)
+		local target = closedParts[part]
+		if isOpen then
+			target = makeOpenTarget(closedParts[part], part.Size, rightDirection, openAngle)
 		end
-		if part.Parent then
-			TweenService:Create(part, tweenInfo, { CFrame = target }):Play()
-		end
+		if part.Parent then TweenService:Create(part, tweenInfo, { CFrame = target }):Play() end
 	end
 
 	setDoorCollision(false)
@@ -377,11 +433,12 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		busy = true
 		open = not open
 		if open then
+			activeRightDirection = getOpenDirection(player)
 			activeOpenAngle = getOpenAngle(player)
 			setDoorCollision(true)
 		end
 
-		playDoor(open, activeOpenAngle)
+		playDoor(open, activeOpenAngle, activeRightDirection)
 		prompt.ActionText = open and "Schließen" or "Öffnen"
 		task.delay(0.45, function()
 			if not open then setDoorCollision(false) end
