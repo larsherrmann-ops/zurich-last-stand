@@ -173,7 +173,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	prompt.ActionText = locked and "Verschlossen" or "Öffnen"
 	prompt.ObjectText = locked and "Wichtiger Eingang" or "Haus-/Ladentür"
 	prompt.HoldDuration = 0.15
-	prompt.MaxActivationDistance = 10
+	prompt.MaxActivationDistance = 14
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = promptParent
 
@@ -185,82 +185,121 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	end
 
 	local original = {}
-	local relative = {}
 	local closedParts = {}
 	local closedPivot = doorObject:IsA("Model") and doorObject:GetPivot() or nil
 	for _, part in parts do
-		original[part] = { CanCollide = part.CanCollide }
+		original[part] = {
+			CanCollide = part.CanCollide,
+			CanTouch = part.CanTouch,
+			CanQuery = part.CanQuery,
+		}
 		closedParts[part] = part.CFrame
-		if closedPivot then relative[part] = closedPivot:ToObjectSpace(part.CFrame) end
 	end
+
 	local open = false
 	local busy = false
 	local activeOpenDirection = Vector3.new(0, 0, -1)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local pivotDriver
+
+	if doorObject:IsA("Model") then
+		pivotDriver = Instance.new("CFrameValue")
+		pivotDriver.Name = "ZurichDoorPivot"
+		pivotDriver.Value = closedPivot
+		pivotDriver.Parent = prompt
+		pivotDriver.Changed:Connect(function(value)
+			if doorObject.Parent then doorObject:PivotTo(value) end
+		end)
+	end
+
+	local function setDoorCollision(isOpen)
+		for part, state in original do
+			if part.Parent then
+				if isOpen then
+					part.CanCollide = false
+				else
+					part.CanCollide = state.CanCollide
+				end
+				part.CanTouch = state.CanTouch
+				part.CanQuery = state.CanQuery
+			end
+		end
+	end
 
 	local function getOpenDirection(player)
 		local character = player and player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local direction = humanoid and humanoid.MoveDirection or Vector3.zero
-		if direction.Magnitude < 0.1 and root then direction = root.CFrame.LookVector end
-		direction = Vector3.new(direction.X, 0, direction.Z)
-		if direction.Magnitude < 0.1 then return activeOpenDirection end
-		return direction.Unit
+		local movement = humanoid and humanoid.MoveDirection or Vector3.zero
+		local doorPosition = closedPivot and closedPivot.Position or closedParts[parts[1]].Position
+		local towardDoor = root and Vector3.new(
+			doorPosition.X - root.Position.X,
+			0,
+			doorPosition.Z - root.Position.Z
+		) or Vector3.zero
+
+		if towardDoor.Magnitude > 0.1 then
+			towardDoor = towardDoor.Unit
+			if movement.Magnitude < 0.1 or movement.Unit:Dot(towardDoor) < 0.2 then
+				return towardDoor
+			end
+		end
+		movement = Vector3.new(movement.X, 0, movement.Z)
+		if movement.Magnitude >= 0.1 then return movement.Unit end
+		if root then
+			local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+			if look.Magnitude >= 0.1 then return look.Unit end
+		end
+		return activeOpenDirection
 	end
 
 	local function translatedCFrame(cframe, direction, distance)
 		return CFrame.new(cframe.Position + direction * distance) * cframe.Rotation
 	end
 
-	local function targetCFrames(isOpen, openDirection)
-		local targets = {}
+	local function targetCFrame(isOpen, openDirection)
 		if doorObject:IsA("Model") then
-			local openPivot
 			if isGateName(doorObject.Name) then
 				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
-				openPivot = closedPivot * CFrame.new(0, height, 0)
-			else
-				local distance = math.max(doorObject:GetExtentsSize().X, doorObject:GetExtentsSize().Z, 3) + 1
-				openPivot = translatedCFrame(closedPivot, openDirection or activeOpenDirection, distance)
+				return closedPivot * CFrame.new(0, height, 0)
 			end
-			for part, relativeCFrame in relative do
-				targets[part] = isOpen and openPivot * relativeCFrame or closedPivot * relativeCFrame
-			end
-		else
-			local part = parts[1]
-			local closedCFrame = closedParts[part]
-			local target = closedCFrame
-			if isOpen and isGateName(doorObject.Name) then
-				target = closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
-			elseif isOpen then
-				local distance = math.max(part.Size.X, part.Size.Z, 3) + 1
-				target = translatedCFrame(closedCFrame, openDirection or activeOpenDirection, distance)
-			end
-			targets[part] = target
+			local size = doorObject:GetExtentsSize()
+			local distance = math.max(size.X, size.Z, 3) + 4
+			return translatedCFrame(closedPivot, openDirection or activeOpenDirection, distance)
 		end
-		return targets
+
+		local part = parts[1]
+		local closedCFrame = closedParts[part]
+		if not isOpen then return closedCFrame end
+		if isGateName(doorObject.Name) then
+			return closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
+		end
+		local distance = math.max(part.Size.X, part.Size.Z, 3) + 4
+		return translatedCFrame(closedCFrame, openDirection or activeOpenDirection, distance)
 	end
 
 	prompt.Triggered:Connect(function(player)
 		if busy then return end
 		busy = true
 		open = not open
-		if open then activeOpenDirection = getOpenDirection(player) end
-		local targets = targetCFrames(open, activeOpenDirection)
-		for part, target in targets do
+		if open then
+			activeOpenDirection = getOpenDirection(player)
+		end
+		if open then setDoorCollision(true) end
+
+		local target = targetCFrame(open, activeOpenDirection)
+		if pivotDriver then
+			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
+		else
+			local part = parts[1]
 			if part.Parent then
-				if open then part.CanCollide = false end
 				TweenService:Create(part, tweenInfo, { CFrame = target }):Play()
 			end
 		end
+
 		prompt.ActionText = open and "Schließen" or "Öffnen"
-		task.delay(0.4, function()
-			if not open then
-				for part, state in original do
-					if part.Parent then part.CanCollide = state.CanCollide end
-				end
-			end
+		task.delay(0.45, function()
+			if not open then setDoorCollision(false) end
 			busy = false
 		end)
 	end)
