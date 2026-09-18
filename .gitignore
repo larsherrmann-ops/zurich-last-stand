@@ -1,9 +1,10 @@
-node_modules/
-dist/
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+.lune/
+.rojo/
 .idea/
 .vscode/
 *.log
 .DS_Store
-
-# Serena tool metadata
-.serena/

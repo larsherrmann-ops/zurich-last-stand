@@ -1,5 +1,5 @@
 name = "astra_specialist"
-description = "Hard-problem specialist for subtle Phaser bugs, performance, pathfinding, procedural systems and difficult algorithms."
+description = "Hard-problem specialist for Roblox engine bugs, performance and pathfinding."
 model = "gpt-6-astra"
 model_reasoning_effort = "high"
 

@@ -1,40 +1,34 @@
-# Roadmap
+# Roblox Roadmap
 
-## V0.1 – Spielbarer Prototyp (erledigt)
+## V0.1 – Code-Prototyp
 
-- [x] Bewegung und Kamera
-- [x] Zielen und Schiessen
-- [x] Zombie-Verfolgung und Schaden
-- [x] Loot, Gesundheit, Munition und Material
-- [x] Barrikaden
-- [x] Tag/Nacht und Horden
-- [x] Zürich-Platzhalterkarte und HUD
+- [x] Rojo-Struktur und Zürich-Testmap
+- [x] Zombie-Verfolgung, Schaden und serverseitiges Schiessen
+- [x] Loot, Barrikaden, Tag/Nacht und HUD
 
-## V0.2 – Solides Kampfgefühl
+## V0.2 – Studio-Playtest
 
-- [ ] Nachladen und Magazin
-- [ ] Drei Waffen mit unterschiedlichen Werten
-- [ ] Trefferfeedback, Sounds und einfache Animationen
-- [ ] Hinderniskollisionen und bessere Zombie-Navigation
-- [ ] Pause- und Startmenü
+- [ ] Rojo mit Studio verbinden und Output-Fehler beheben
+- [ ] Spawn, Schiessen, Loot und Barrikaden testen
+- [ ] Zwei-Spieler-Test
+- [ ] Mobile Buttons und Controller-Eingabe
 
-## V0.3 – Zürich HB
+## V0.3 – Kampf
 
-- [ ] Tilemap statt gezeichneter Platzhalterkarte
-- [ ] Begehbares HB-Areal und Bahnhofstrasse
-- [ ] Gebäude, Türen und durchsuchbare Container
-- [ ] VBZ-Tram als besonderes Loot-Gebiet
+- [ ] Pistole, Schrotflinte und Nahkampf als Tools
+- [ ] Animationen, Trefferfeedback und Sounds
+- [ ] PathfindingService und vier Zombiearten
+- [ ] Barrikaden-Haltbarkeit und Reparatur
 
-## V0.4 – Survival und Base
+## V0.4 – Zürich und Figuren
 
-- [ ] Inventar und Loot-Seltenheiten
-- [ ] Haltbarkeit und Reparatur von Barrikaden
-- [ ] Bau-Menü und mehrere Bauteile
-- [ ] Drei Zombie-Typen und Nacht-Boss
+- [ ] hochwertige HB-/Bahnhofstrasse-Map und VBZ-Tram
+- [ ] durchsuchbare Gebäude
+- [ ] drei Klassen und eigene Outfits
 
-## V1.0 – Drei Nächte in Zürich
+## V1.0 – Release
 
-- [ ] Missionen und NPC-Überlebende
-- [ ] Speichern/Laden
-- [ ] Evakuierungsfinale am Bürkliplatz
-- [ ] Balancing, Einstellungen und vollständiger Audio-/Grafikstil
+- [ ] Lobby, drei Nächte und Evakuierungsfinale
+- [ ] DataStore für kosmetische Freischaltungen
+- [ ] PC-, Mobile- und Controller-Steuerung
+- [ ] Performance-, Moderations- und Release-Check

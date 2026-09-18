@@ -1,41 +1,33 @@
-# Game Design – Zurich: Last Stand
+# Game Design – Roblox
 
-## Vision
+## Spielidee
 
-Ein schnelles, düsteres Survival-Spiel, das durch erkennbare Zürcher Orte eine eigene Identität erhält. Tagsüber geht der Spieler riskante Loot-Runs ein. Nachts verteidigt er seine Position gegen grössere Horden.
+Ein kooperatives Third-Person-Zombie-Survival-Spiel für 1–4 Spieler. Tagsüber wird Zürich geplündert, nachts verteidigt das Team seine Base.
 
-## Kernschleife
+## Kernablauf
 
-1. Zürich erkunden.
-2. Munition, Medizin und Baumaterial sammeln.
-3. Einen sicheren Ort auswählen und Barrikaden bauen.
-4. Die Nacht überleben.
-5. Mit stärkeren Waffen und neuen Gebieten den nächsten Tag beginnen.
+1. Beim Zürich HB erscheinen.
+2. Gebäude und Trams durchsuchen.
+3. Waffen, Medizin und Baumaterial sammeln.
+4. Eine Base verbarrikadieren.
+5. Drei Horden überleben.
+6. Am Bürkliplatz ein Boot erreichen.
 
-## Ziel der ersten vollständigen Version
+## Figuren
 
-Der Spieler startet beim Zürich HB und muss drei Nächte überleben. Dafür soll er die Bahnhofstrasse plündern, eine kleine Base errichten und in der letzten Nacht einen Evakuierungspunkt am Bürkliplatz erreichen.
+- Lars, Plünderer: mehr Inventarplatz.
+- Mia, Sanitäterin: stärkere Heilung.
+- Walter, VBZ-Mechaniker: günstigere Reparaturen.
 
-## Welt
+Zuerst werden normale Roblox-Avatare verwendet; Klassenfähigkeiten und Outfits folgen später.
 
-- Zürich HB: Startpunkt, grosse Innenräume, viele schwache Zombies
-- Bahnhofstrasse: wertvoller Loot, offene und gefährliche Strasse
-- Langstrasse: Waffen und viele schnelle Zombies
-- Bellevue/Bürkliplatz: späterer Evakuierungspunkt
-- ETH/Uni: Medizin, Technik und Story-Hinweise
-- Zürichsee: spätere Boots-Fluchtroute
+## Gegner
 
-## Systeme
+- Standard-Zombie
+- Runner
+- gepanzerter Polizei-Zombie
+- Brute, der Barrikaden zerstört
 
-- Gesundheit, Munition und Inventar
-- Pistole, Schrotflinte, Nahkampf und später Sturmgewehr
-- Normale, schnelle und schwere Zombies
-- Geräusche locken Zombies an
-- Tag/Nacht mit stärkeren Nacht-Horden
-- Barrikaden, Reparaturen und kleine Base
-- Loot mit Seltenheiten und begrenztem Platz
-- Missionen und mehrere Fluchtmöglichkeiten
+## Produktziel
 
-## Stil
-
-Top-Down-Perspektive, leicht düstere Farben, klare Silhouetten, Schweizer Beschilderung und erkennbare gelb-weisse VBZ-Elemente. Gewalt bleibt stilisiert, nicht fotorealistisch.
+Wiederholbare Runden von 15–20 Minuten, PC/Mobile/Controller, serverseitig kontrollierter Kampf und ausschliesslich geprüfte Assets.

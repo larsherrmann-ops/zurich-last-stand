@@ -1,76 +1,46 @@
-# Zurich: Last Stand
+# Zurich: Last Stand – Roblox
 
-Ein 2D-Top-Down-Zombie-Survival-Game in Zürich. Der Spieler plündert Orte, bekämpft Zombies, baut Barrikaden und überlebt immer gefährlichere Nächte.
+Ein kooperatives Zombie-Survival-Spiel in einer stilisierten Roblox-Version von Zürich. Spieler sammeln Loot, bauen Barrikaden und überleben nachts stärkere Zombie-Horden.
 
-## Schnellstart unter Windows
+## Spielbare V1
 
-Voraussetzungen: Node.js 20 oder neuer und npm.
+- Zürich-Testmap mit HB, Bahnhofstrasse, Langstrasse, ETH, Bellevue und Zürichsee
+- Multiplayer-Grundlage, Zombies, serverseitiges Schiessen und Loot
+- Barrikaden mit `E`, Tag/Nacht und HUD
+
+## Start mit Rojo
+
+Installiere Roblox Studio, VS Code, Rojo 7.5+ und das Rojo-Studio-Plugin.
 
 ```powershell
 cd C:\Users\lars_\zurich-last-stand
-npm install
-npm run dev
+rojo serve
 ```
 
-Öffne danach die von Vite angezeigte lokale Adresse, normalerweise `http://localhost:5173`.
+Roblox Studio öffnen, eine leere Baseplate erstellen, im Rojo-Plugin mit `localhost:34872` verbinden und **Play** drücken. Alternativ:
+
+```powershell
+rojo build -o ZurichLastStand.rbxlx
+```
 
 ## Steuerung
 
-- `WASD` oder Pfeiltasten: laufen
-- Maus: zielen
-- Linksklick gedrückt halten: schiessen
-- `E`: Barrikade bauen (kostet 2 Material)
-- `R`: nach Game Over neu starten
+- `WASD`: bewegen
+- Maus: Kamera und Zielen
+- Linksklick: schiessen
+- `E`: Barrikade bauen
 
-## Aktueller Stand (V0.1)
-
-- Spielbare grosse Zürich-Karte mit HB, Bahnhofstrasse, Langstrasse, Bellevue, ETH und Zürichsee
-- Bewegung, Zielen und Schiessen
-- Zombies verfolgen den Spieler und verursachen Schaden
-- Loot gibt Munition, Heilung und Baumaterial
-- Barrikaden können gebaut und von Zombies zerstört werden
-- Tag-/Nacht-Zyklus; nachts sind Zombies schneller und es erscheint eine Horde
-- HUD, Kill-Zähler, Game Over und Neustart
-- Keine externen Assets nötig: alle Platzhaltergrafiken werden im Code erzeugt
-
-## Projektstruktur
+## Struktur
 
 ```text
-zurich-last-stand/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── README.md
-├── CODEX.md
-├── AGENTS.md
-├── .codex/
-│   ├── config.toml
-│   └── agents/
-│       ├── terra_worker.toml
-│       ├── sol_specialist.toml
-│       ├── sol_reviewer.toml
-│       └── astra_specialist.toml
+├── default.project.json
+├── rokit.toml
+├── AGENTS.md / CODEX.md / .codex/
 ├── docs/
-│   ├── GAME_DESIGN.md
-│   └── ROADMAP.md
 └── src/
-    ├── main.ts
-    ├── config.ts
-    └── scenes/
-        ├── BootScene.ts
-        └── GameScene.ts
+    ├── shared/Config.luau
+    ├── server/*.luau
+    └── client/main.client.luau
 ```
 
-## Qualitätskontrolle
-
-Nach jeder Änderung mindestens ausführen:
-
-```powershell
-npm run build
-```
-
-Wenn Gameplay oder Darstellung verändert wurden, zusätzlich `npm run dev` starten und im Browser testen.
-
-## Automatische Codex-Orchestrierung
-
-Beim Öffnen dieses Projektordners erkennt Codex automatisch `AGENTS.md` und `.codex/config.toml`. Der Hauptthread verwendet Luna als Orchestrator und kann je nach Aufgabe Terra, Sol oder Astra einsetzen. Nach dem erstmaligen Entpacken Codex neu starten, damit die Projektkonfiguration sicher geladen wird.
+Codex erkennt die Projektregeln und Agenten beim Öffnen automatisch. Gameplay-Änderungen immer in Roblox Studio testen; Multiplayer unter **Test → Start** mit mindestens zwei Spielern.
