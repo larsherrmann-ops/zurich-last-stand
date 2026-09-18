@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local Config = require(ReplicatedStorage.Shared.Config)
+local MovementController = require(script.Parent.MovementController)
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
@@ -29,6 +31,8 @@ local colors = {
 	gold = Color3.fromRGB(229, 184, 83),
 	blue = Color3.fromRGB(41, 72, 98),
 }
+
+MovementController.Start(Config.Player)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "SurvivalHUD"

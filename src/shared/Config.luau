@@ -2,6 +2,11 @@ return {
 	Player = {
 		MaxHealth = 100,
 		WalkSpeed = 18,
+        SprintSpeed = 26,
+        CrouchSpeed = 8,
+        JumpPower = 50,
+        CameraMinZoomDistance = 0.5,
+        CameraMaxZoomDistance = 20,
 		StartingAmmo = 30,
 		StartingMaterials = 3,
 		StartingMedkits = 1,
