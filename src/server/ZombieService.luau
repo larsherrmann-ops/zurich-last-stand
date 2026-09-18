@@ -4,6 +4,7 @@ local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 local ZombieService = {}
 local folder
+local spawnFolder
 local isNight = false
 local lastUpdate = 0
 
@@ -37,7 +38,7 @@ end
 
 function ZombieService.Spawn()
 	if not folder or #folder:GetChildren() >= Config.Zombie.MaxActive then return end
-	local spawns = workspace.ZurichMap.ZombieSpawns:GetChildren()
+	local spawns = spawnFolder and spawnFolder:GetChildren() or {}
 	if #spawns == 0 then return end
 	local position = spawns[math.random(1, #spawns)].Position
 	local model = Instance.new("Model")
@@ -77,10 +78,11 @@ function ZombieService.SetNight(value)
 	end
 end
 
-function ZombieService.Start()
+function ZombieService.Start(map)
 	folder = Instance.new("Folder")
 	folder.Name = "Zombies"
 	folder.Parent = workspace
+	spawnFolder = map and map:FindFirstChild("ZombieSpawns") or workspace:FindFirstChild("ZurichMap") and workspace.ZurichMap:FindFirstChild("ZombieSpawns")
 	for _ = 1, 8 do ZombieService.Spawn() end
 	task.spawn(function()
 		while true do

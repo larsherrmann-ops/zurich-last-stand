@@ -38,7 +38,7 @@ remote("RobuxAction")
 
 local map = MapService.Create()
 InventoryService.Start(remotes, map)
-ZombieService.Start()
+ZombieService.Start(map)
 LootService.Start(map, InventoryService.CollectLoot)
 DayNightService.Start(stateEvent, ZombieService.SetNight)
 
@@ -94,4 +94,3 @@ buildEvent.OnServerEvent:Connect(function(player, targetPosition)
 end)
 
 Players.PlayerRemoving:Connect(function(player) lastShot[player] = nil end)
-

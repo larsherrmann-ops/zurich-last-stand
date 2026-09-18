@@ -19,8 +19,7 @@
     "Lighting": {
       "$properties": {
         "Brightness": 2,
-        "ClockTime": 10,
-        "Technology": "Future"
+        "ClockTime": 10
       }
     }
   }
