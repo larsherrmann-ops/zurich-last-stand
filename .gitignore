@@ -4,4 +4,6 @@ dist/
 .vscode/
 *.log
 .DS_Store
+
+# Serena tool metadata
 .serena/

@@ -42,6 +42,14 @@ zurich-last-stand/
 ├── tsconfig.json
 ├── README.md
 ├── CODEX.md
+├── AGENTS.md
+├── .codex/
+│   ├── config.toml
+│   └── agents/
+│       ├── terra_worker.toml
+│       ├── sol_specialist.toml
+│       ├── sol_reviewer.toml
+│       └── astra_specialist.toml
 ├── docs/
 │   ├── GAME_DESIGN.md
 │   └── ROADMAP.md
@@ -62,3 +70,7 @@ npm run build
 ```
 
 Wenn Gameplay oder Darstellung verändert wurden, zusätzlich `npm run dev` starten und im Browser testen.
+
+## Automatische Codex-Orchestrierung
+
+Beim Öffnen dieses Projektordners erkennt Codex automatisch `AGENTS.md` und `.codex/config.toml`. Der Hauptthread verwendet Luna als Orchestrator und kann je nach Aufgabe Terra, Sol oder Astra einsetzen. Nach dem erstmaligen Entpacken Codex neu starten, damit die Projektkonfiguration sicher geladen wird.

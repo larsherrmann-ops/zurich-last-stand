@@ -1,0 +1,19 @@
+# Project-local orchestration for Zurich: Last Stand.
+model = "gpt-5.6-luna"
+model_reasoning_effort = "xhigh"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 4
+
+[agents.terra_worker]
+config_file = ".codex/agents/terra_worker.toml"
+
+[agents.sol_specialist]
+config_file = ".codex/agents/sol_specialist.toml"
+
+[agents.sol_reviewer]
+config_file = ".codex/agents/sol_reviewer.toml"
+
+[agents.astra_specialist]
+config_file = ".codex/agents/astra_specialist.toml"
