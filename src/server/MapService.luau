@@ -1,9 +1,12 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local ModelService = require(script.Parent.ModelService)
 
 local MapService = {}
+local brokenWindows = {}
 
 local FALLBACK_SPAWNS = {
 	Vector3.new(0, 2, 0),
@@ -94,11 +97,16 @@ local function isGateName(name)
 	local lower = string.lower(name)
 	return string.find(lower, "rollup", 1, true) ~= nil
 		or string.find(lower, "garage", 1, true) ~= nil
-		or string.find(lower, "storedoor", 1, true) ~= nil
-		or string.find(lower, "stoordoor", 1, true) ~= nil
-		or string.find(lower, "groupdoor", 1, true) ~= nil
+		or string.find(lower, "overhead", 1, true) ~= nil
 end
 
+local function isDoubleDoorName(name)
+	local lower = string.lower(name)
+	return string.find(lower, "stoordoor", 1, true) ~= nil
+		or string.find(lower, "storedoor", 1, true) ~= nil
+		or string.find(lower, "groupdoor", 1, true) ~= nil
+		or string.find(lower, "double", 1, true) ~= nil
+end
 local function findLockedBuilding(instance)
 	local parent = instance
 	while parent do
@@ -153,6 +161,7 @@ function MapService.DamageWindow(target, amount)
 	end
 
 	window:SetAttribute("ZurichBroken", true)
+	brokenWindows[window] = true
 	for _, part in getWindowParts(window) do
 		part.CanCollide = false
 		part.CanQuery = false
@@ -166,6 +175,64 @@ function MapService.DamageWindow(target, amount)
 	return true, 0
 end
 
+local function getWindowBounds(window)
+	if window:IsA("Model") then
+		return window:GetBoundingBox()
+	elseif window:IsA("BasePart") then
+		return window.CFrame, window.Size
+	end
+	return nil, nil
+end
+
+function MapService.StartWindowPassage()
+	if MapService._windowPassageConnection then return end
+	MapService._windowPassageConnection = RunService.Heartbeat:Connect(function()
+		for window in brokenWindows do
+			if not window.Parent then
+				brokenWindows[window] = nil
+				continue
+			end
+
+			local boxCFrame, boxSize = getWindowBounds(window)
+			if not boxCFrame or not boxSize then continue end
+
+			local thinOnX = boxSize.X <= boxSize.Z
+			local normal = thinOnX and boxCFrame.RightVector or boxCFrame.LookVector
+			normal = Vector3.new(normal.X, 0, normal.Z)
+			if normal.Magnitude < 0.1 then continue end
+			normal = normal.Unit
+
+			local halfWidth = math.max(boxSize.X, boxSize.Z) / 2 + 1.5
+			local halfHeight = boxSize.Y / 2 + 2.5
+			local halfThickness = math.min(boxSize.X, boxSize.Z) / 2 + 2.5
+
+			for _, player in Players:GetPlayers() do
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+				if root and humanoid and humanoid.Health > 0 then
+					local localPosition = boxCFrame:PointToObjectSpace(root.Position)
+					local lateral = math.abs(thinOnX and localPosition.Z or localPosition.X)
+					local sideDistance = (root.Position - boxCFrame.Position):Dot(normal)
+					local movement = humanoid.MoveDirection
+
+					if lateral <= halfWidth
+						and math.abs(localPosition.Y) <= halfHeight
+						and math.abs(sideDistance) <= halfThickness
+						and movement.Magnitude > 0.1 then
+						local throughDirection = sideDistance >= 0 and -normal or normal
+						if movement.Unit:Dot(throughDirection) > 0.2 then
+							local distance = math.abs(sideDistance) + math.min(boxSize.X, boxSize.Z) + 3
+							local target = root.Position + throughDirection * distance
+							root.CFrame = CFrame.new(target) * root.CFrame.Rotation
+							break
+						end
+					end
+				end
+			end
+		end
+	end)
+end
 local function configureDoor(promptParent, parts, locked, doorObject)
 	if not promptParent or #parts == 0 or promptParent:FindFirstChild("ZurichDoorPrompt") then return false end
 	local prompt = Instance.new("ProximityPrompt")
@@ -178,6 +245,9 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	prompt.Parent = promptParent
 
 	if locked then
+		for _, part in parts do
+			part.CanCollide = true
+		end
 		prompt.Triggered:Connect(function(player)
 			notify(player, "EINGANG VERRIEGELT  ·  FENSTER EINSCHLAGEN", "Info")
 		end)
@@ -186,6 +256,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 
 	local original = {}
 	local closedParts = {}
+	local relativeParts = {}
 	local closedPivot = doorObject:IsA("Model") and doorObject:GetPivot() or nil
 	for _, part in parts do
 		original[part] = {
@@ -194,6 +265,9 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 			CanQuery = part.CanQuery,
 		}
 		closedParts[part] = part.CFrame
+		if closedPivot then
+			relativeParts[part] = closedPivot:ToObjectSpace(part.CFrame)
+		end
 	end
 
 	local open = false
@@ -201,8 +275,30 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	local activeOpenAngle = math.rad(-90)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local pivotDriver
+	local doubleDoor = doorObject:IsA("Model") and isDoubleDoorName(doorObject.Name)
+	local doubleDrivers = {}
 
-	if doorObject:IsA("Model") then
+	if doubleDoor then
+		local groups = { left = {}, right = {} }
+		for part, relative in relativeParts do
+			local side = relative.Position.X <= 0 and "left" or "right"
+			table.insert(groups[side], { Part = part, Relative = relative })
+		end
+		for side, group in groups do
+			local driver = Instance.new("CFrameValue")
+			driver.Name = "ZurichDoorPivot_" .. side
+			driver.Value = closedPivot
+			driver.Parent = prompt
+			driver.Changed:Connect(function(value)
+				for _, item in group do
+					if item.Part.Parent then
+						item.Part.CFrame = value * item.Relative
+					end
+				end
+			end)
+			doubleDrivers[side] = driver
+		end
+	elseif doorObject:IsA("Model") then
 		pivotDriver = Instance.new("CFrameValue")
 		pivotDriver.Name = "ZurichDoorPivot"
 		pivotDriver.Value = closedPivot
@@ -215,7 +311,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	local function setDoorCollision(isOpen)
 		for part, state in original do
 			if part.Parent then
-				part.CanCollide = isOpen and false or state.CanCollide
+				part.CanCollide = isOpen and false or true
 				part.CanTouch = state.CanTouch
 				part.CanQuery = state.CanQuery
 			end
@@ -239,23 +335,42 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		return math.rad(90)
 	end
 
-	local function targetCFrame(isOpen, openAngle)
+	local function playDoor(isOpen, openAngle)
+		if doubleDoor then
+			for side, driver in doubleDrivers do
+				local angle = side == "left" and math.rad(90) or math.rad(-90)
+				local target = isOpen and closedPivot * CFrame.Angles(0, angle, 0) or closedPivot
+				TweenService:Create(driver, tweenInfo, { Value = target }):Play()
+			end
+			return
+		end
+
 		if doorObject:IsA("Model") then
+			local target
 			if isGateName(doorObject.Name) then
 				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
-				return closedPivot * CFrame.new(0, height, 0)
+				target = isOpen and closedPivot * CFrame.new(0, height, 0) or closedPivot
+			else
+				target = closedPivot * CFrame.Angles(0, isOpen and (openAngle or activeOpenAngle) or 0, 0)
 			end
-			return closedPivot * CFrame.Angles(0, isOpen and (openAngle or activeOpenAngle) or 0, 0)
+			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
+			return
 		end
 
 		local part = parts[1]
 		local closedCFrame = closedParts[part]
-		if not isOpen then return closedCFrame end
-		if isGateName(doorObject.Name) then
-			return closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
+		local target = closedCFrame
+		if isOpen and isGateName(doorObject.Name) then
+			target = closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
+		elseif isOpen then
+			target = closedCFrame * CFrame.Angles(0, openAngle or activeOpenAngle, 0)
 		end
-		return closedCFrame * CFrame.Angles(0, openAngle or activeOpenAngle, 0)
+		if part.Parent then
+			TweenService:Create(part, tweenInfo, { CFrame = target }):Play()
+		end
 	end
+
+	setDoorCollision(false)
 
 	prompt.Triggered:Connect(function(player)
 		if busy then return end
@@ -266,16 +381,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 			setDoorCollision(true)
 		end
 
-		local target = targetCFrame(open, activeOpenAngle)
-		if pivotDriver then
-			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
-		else
-			local part = parts[1]
-			if part.Parent then
-				TweenService:Create(part, tweenInfo, { CFrame = target }):Play()
-			end
-		end
-
+		playDoor(open, activeOpenAngle)
 		prompt.ActionText = open and "Schließen" or "Öffnen"
 		task.delay(0.45, function()
 			if not open then setDoorCollision(false) end
@@ -480,6 +586,7 @@ function MapService.Create()
 	createLighting()
 	local old = workspace:FindFirstChild("ZurichMap")
 	if old then old:Destroy() end
+brokenWindows = {}
 
 	local world = workspace:FindFirstChild("World")
 	local map = Instance.new("Folder")
@@ -493,6 +600,7 @@ function MapService.Create()
 		createCityGround(map)
 	end
 	createRuntimeObjects(map, world, positions)
+	MapService.StartWindowPassage()
 	return map
 end
 
