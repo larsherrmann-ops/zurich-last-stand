@@ -198,7 +198,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 
 	local open = false
 	local busy = false
-	local activeOpenDirection = Vector3.new(0, 0, -1)
+	local activeOpenAngle = math.rad(-90)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local pivotDriver
 
@@ -215,57 +215,37 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	local function setDoorCollision(isOpen)
 		for part, state in original do
 			if part.Parent then
-				if isOpen then
-					part.CanCollide = false
-				else
-					part.CanCollide = state.CanCollide
-				end
+				part.CanCollide = isOpen and false or state.CanCollide
 				part.CanTouch = state.CanTouch
 				part.CanQuery = state.CanQuery
 			end
 		end
 	end
 
-	local function getOpenDirection(player)
+	local function getOpenAngle(player)
 		local character = player and player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local movement = humanoid and humanoid.MoveDirection or Vector3.zero
-		local doorPosition = closedPivot and closedPivot.Position or closedParts[parts[1]].Position
-		local towardDoor = root and Vector3.new(
-			doorPosition.X - root.Position.X,
-			0,
-			doorPosition.Z - root.Position.Z
-		) or Vector3.zero
+		if not root then return math.rad(-90) end
 
-		if towardDoor.Magnitude > 0.1 then
-			towardDoor = towardDoor.Unit
-			if movement.Magnitude < 0.1 or movement.Unit:Dot(towardDoor) < 0.2 then
-				return towardDoor
-			end
+		local playerRight = Vector3.new(root.CFrame.RightVector.X, 0, root.CFrame.RightVector.Z)
+		local doorRight = closedPivot and Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z) or playerRight
+		if playerRight.Magnitude < 0.1 or doorRight.Magnitude < 0.1 then return math.rad(-90) end
+
+		playerRight = playerRight.Unit
+		doorRight = doorRight.Unit
+		if playerRight:Dot(doorRight) >= 0 then
+			return math.rad(-90)
 		end
-		movement = Vector3.new(movement.X, 0, movement.Z)
-		if movement.Magnitude >= 0.1 then return movement.Unit end
-		if root then
-			local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
-			if look.Magnitude >= 0.1 then return look.Unit end
-		end
-		return activeOpenDirection
+		return math.rad(90)
 	end
 
-	local function translatedCFrame(cframe, direction, distance)
-		return CFrame.new(cframe.Position + direction * distance) * cframe.Rotation
-	end
-
-	local function targetCFrame(isOpen, openDirection)
+	local function targetCFrame(isOpen, openAngle)
 		if doorObject:IsA("Model") then
 			if isGateName(doorObject.Name) then
 				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
 				return closedPivot * CFrame.new(0, height, 0)
 			end
-			local size = doorObject:GetExtentsSize()
-			local distance = math.max(size.X, size.Z, 3) + 4
-			return translatedCFrame(closedPivot, openDirection or activeOpenDirection, distance)
+			return closedPivot * CFrame.Angles(0, isOpen and (openAngle or activeOpenAngle) or 0, 0)
 		end
 
 		local part = parts[1]
@@ -274,8 +254,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		if isGateName(doorObject.Name) then
 			return closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
 		end
-		local distance = math.max(part.Size.X, part.Size.Z, 3) + 4
-		return translatedCFrame(closedCFrame, openDirection or activeOpenDirection, distance)
+		return closedCFrame * CFrame.Angles(0, openAngle or activeOpenAngle, 0)
 	end
 
 	prompt.Triggered:Connect(function(player)
@@ -283,11 +262,11 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		busy = true
 		open = not open
 		if open then
-			activeOpenDirection = getOpenDirection(player)
+			activeOpenAngle = getOpenAngle(player)
+			setDoorCollision(true)
 		end
-		if open then setDoorCollision(true) end
 
-		local target = targetCFrame(open, activeOpenDirection)
+		local target = targetCFrame(open, activeOpenAngle)
 		if pivotDriver then
 			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
 		else
@@ -348,42 +327,73 @@ local function configureDoors(world)
 	end
 end
 
+local function isBreakableWindowName(name)
+	local lower = string.lower(name)
+	if lower == "window" or lower == "glass" or lower == "glasswindow" or lower == "windowpane" then
+		return true
+	end
+	if string.find(lower, "window", 1, true) then
+		return string.find(lower, "row", 1, true) == nil
+			and string.find(lower, "frame", 1, true) == nil
+	end
+	return false
+end
+
+local function configureBreakableWindow(object, root)
+	if not root or root:FindFirstChild("ZurichWindowPrompt") then return false end
+	local maximum = 3
+	object:SetAttribute("ZurichBreakableWindow", true)
+	object:SetAttribute("ZurichWindowMaxHealth", maximum)
+	object:SetAttribute("ZurichWindowHealth", maximum)
+	for _, part in getWindowParts(object) do
+		part:SetAttribute("ZurichBreakableWindow", true)
+		part:SetAttribute("ZurichWindowOriginalTransparency", part.Transparency)
+	end
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "ZurichWindowPrompt"
+	prompt.ActionText = "Einschlagen (3)"
+	prompt.ObjectText = "Fenster"
+	prompt.HoldDuration = 0.35
+	prompt.MaxActivationDistance = 8
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = root
+	prompt.Triggered:Connect(function(player)
+		local broken, remaining = MapService.DamageWindow(object, 1)
+		if broken then
+			notify(player, "FENSTER ZERBROCHEN  ·  DURCHGANG OFFEN", "Success")
+		elseif remaining then
+			prompt.ActionText = "Einschlagen (" .. remaining .. ")"
+			notify(player, "GLAS BESCHÄDIGT  ·  NOCH " .. remaining .. " TREFFER", "Info")
+		end
+	end)
+	return true
+end
+
 local function configureBreakableWindows(world)
 	if not world then return end
 	local configured = 0
+	local configuredObjects = {}
+
 	for _, object in world:GetDescendants() do
-		if object:IsA("Model") and string.lower(object.Name) == "window" then
+		if object:IsA("Model") and isBreakableWindowName(object.Name) then
 			local root = object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true)
-			if root and not root:FindFirstChild("ZurichWindowPrompt") then
-				local maximum = 3
-				object:SetAttribute("ZurichBreakableWindow", true)
-				object:SetAttribute("ZurichWindowMaxHealth", maximum)
-				object:SetAttribute("ZurichWindowHealth", maximum)
-				for _, part in getWindowParts(object) do
-					part:SetAttribute("ZurichBreakableWindow", true)
-					part:SetAttribute("ZurichWindowOriginalTransparency", part.Transparency)
-				end
-				local prompt = Instance.new("ProximityPrompt")
-				prompt.Name = "ZurichWindowPrompt"
-				prompt.ActionText = "Einschlagen (3)"
-				prompt.ObjectText = "Verriegeltes Fenster"
-				prompt.HoldDuration = 0.35
-				prompt.MaxActivationDistance = 8
-				prompt.RequiresLineOfSight = false
-				prompt.Parent = root
-				prompt.Triggered:Connect(function(player)
-					local broken, remaining = MapService.DamageWindow(object, 1)
-					if broken then
-						notify(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
-					elseif remaining then
-						prompt.ActionText = "Einschlagen (" .. remaining .. ")"
-						notify(player, "GLAS BESCHÄDIGT  ·  NOCH " .. remaining .. " TREFFER", "Info")
-					end
-				end)
+			if root and configureBreakableWindow(object, root) then
+				configuredObjects[object] = true
 				configured += 1
 			end
 		end
 	end
+
+	for _, object in world:GetDescendants() do
+		if object:IsA("BasePart") and isBreakableWindowName(object.Name) then
+			local parentModel = object:FindFirstAncestorOfClass("Model")
+			if not parentModel or not configuredObjects[parentModel] then
+				if configureBreakableWindow(object, object) then configured += 1 end
+			end
+		end
+	end
+
 	if configured > 0 then
 		print("ZurichLastStand: configured " .. configured .. " breakable windows")
 	end
