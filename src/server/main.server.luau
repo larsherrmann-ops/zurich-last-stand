@@ -20,7 +20,7 @@ stateEvent.Name = "State"
 stateEvent.Parent = remotes
 
 MapService.Create()
-ZombieService.Start()
+-- Zombies will be enabled by the dynamic spawn director in a later slice.
 LootService.Start()
 DayNightService.Start(stateEvent, ZombieService.SetNight)
 
@@ -32,6 +32,8 @@ Players.PlayerAdded:Connect(function(player)
 		local humanoid = character:WaitForChild("Humanoid")
 		humanoid.MaxHealth = Config.Player.MaxHealth
 		humanoid.Health = Config.Player.MaxHealth
+		humanoid.UseJumpPower = true
+		humanoid.JumpPower = Config.Player.JumpPower
 		humanoid.WalkSpeed = Config.Player.WalkSpeed
 	end)
 end)
@@ -80,7 +82,7 @@ buildEvent.OnServerEvent:Connect(function(player, targetPosition)
 	barrier.Anchored = true
 	barrier.Material = Enum.Material.WoodPlanks
 	barrier.Color = Color3.fromRGB(118, 78, 48)
-	barrier.Parent = workspace.ZurichMap
+	barrier.Parent = workspace.SurvivalMap
 end)
 
 Players.PlayerRemoving:Connect(function(player) lastShot[player] = nil end)

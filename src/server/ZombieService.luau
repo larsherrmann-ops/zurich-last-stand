@@ -36,35 +36,8 @@ local function bodyPart(model, name, size, position, color)
 end
 
 function ZombieService.Spawn()
-	if not folder or #folder:GetChildren() >= Config.Zombie.MaxActive then return end
-	local spawns = workspace.ZurichMap.ZombieSpawns:GetChildren()
-	if #spawns == 0 then return end
-	local position = spawns[math.random(1, #spawns)].Position
-	local model = Instance.new("Model")
-	model.Name = "Zombie"
-	model:SetAttribute("LastAttack", 0)
-	local root = bodyPart(model, "HumanoidRootPart", Vector3.new(2, 2, 1), position + Vector3.new(0, 3, 0), Color3.fromRGB(70, 90, 58))
-	root.Transparency = 1
-	root.CanCollide = false
-	local torso = bodyPart(model, "Torso", Vector3.new(2.5, 3, 1.4), root.Position, Color3.fromRGB(82, 107, 70))
-	local head = bodyPart(model, "Head", Vector3.new(2, 2, 2), root.Position + Vector3.new(0, 2.4, 0), Color3.fromRGB(119, 143, 91))
-	for _, object in { torso, head } do
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
-		weld.Part1 = object
-		weld.Parent = root
-	end
-	local humanoid = Instance.new("Humanoid")
-	humanoid.MaxHealth = Config.Zombie.Health
-	humanoid.Health = Config.Zombie.Health
-	humanoid.WalkSpeed = isNight and Config.Zombie.NightSpeed or Config.Zombie.WalkSpeed
-	humanoid.Parent = model
-	model.PrimaryPart = root
-	model.Parent = folder
-	model:PivotTo(CFrame.new(position + Vector3.new(0, 3, 0)))
-	humanoid.Died:Connect(function()
-		task.delay(1.5, function() if model.Parent then model:Destroy() end end)
-	end)
+	-- Spawn positions will come from a server-side director near active players.
+	return
 end
 
 function ZombieService.SetNight(value)
@@ -81,14 +54,6 @@ function ZombieService.Start()
 	folder = Instance.new("Folder")
 	folder.Name = "Zombies"
 	folder.Parent = workspace
-	for _ = 1, 8 do ZombieService.Spawn() end
-	task.spawn(function()
-		while true do
-			task.wait(Config.Zombie.SpawnDelay)
-			ZombieService.Spawn()
-			if isNight then ZombieService.Spawn() end
-		end
-	end)
 	RunService.Heartbeat:Connect(function()
 		if os.clock() - lastUpdate < 0.22 then return end
 		lastUpdate = os.clock()

@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local Config = require(ReplicatedStorage.Shared.Config)
+local MovementController = require(script.Parent.MovementController)
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -8,6 +10,8 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local shootEvent = remotes:WaitForChild("Shoot")
 local buildEvent = remotes:WaitForChild("BuildBarricade")
 local stateEvent = remotes:WaitForChild("State")
+
+MovementController.Start(Config.Player)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "SurvivalHUD"
@@ -40,7 +44,7 @@ local function updateHud()
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local health = humanoid and math.floor(humanoid.Health) or 0
-	hud.Text = string.format("  ZÜRICH: LAST STAND  |  %s %d\n  Leben %d   Munition %d   Material %d   Kills %d\n  Klick: Schiessen   E: Barrikade bauen", phase, day, health, player:GetAttribute("Ammo") or 0, player:GetAttribute("Materials") or 0, player:GetAttribute("Kills") or 0)
+	hud.Text = string.format("  LAST STAND  |  %s %d\n  Leben %d   Munition %d   Material %d   Kills %d\n  Klick: Schiessen   E: Barrikade   Shift: Sprint   C: Ducken   Space: Springen", phase, day, health, player:GetAttribute("Ammo") or 0, player:GetAttribute("Materials") or 0, player:GetAttribute("Kills") or 0)
 end
 
 for _, attribute in { "Ammo", "Materials", "Kills" } do
