@@ -62,8 +62,13 @@ shootEvent.OnServerEvent:Connect(function(player, origin, direction)
 	if player:GetAttribute("RedDotOwned") then range += 45 end
 	local result = workspace:Raycast(origin, direction.Unit * range, params)
 	if result then
-		if MapService.BreakWindow(result.Instance) then
-			remotes.Notify:FireClient(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
+		local windowBroken, windowRemaining = MapService.DamageWindow(result.Instance, 1)
+		if windowRemaining ~= nil then
+			if windowBroken then
+				remotes.Notify:FireClient(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
+			else
+				remotes.Notify:FireClient(player, "GLAS BESCHÄDIGT  ·  NOCH " .. windowRemaining .. " TREFFER", "Info")
+			end
 			return
 		end
 		local model = result.Instance:FindFirstAncestorOfClass("Model")

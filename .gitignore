@@ -11,3 +11,5 @@
 *.rbxlx.lock
 
 *.rbxl.lock
+
+.serena/

@@ -1,5 +1,6 @@
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local ModelService = require(script.Parent.ModelService)
 
 local MapService = {}
@@ -89,6 +90,15 @@ local function isDoorName(name)
 	return hasDoor and not isNumber
 end
 
+local function isGateName(name)
+	local lower = string.lower(name)
+	return string.find(lower, "rollup", 1, true) ~= nil
+		or string.find(lower, "garage", 1, true) ~= nil
+		or string.find(lower, "storedoor", 1, true) ~= nil
+		or string.find(lower, "stoordoor", 1, true) ~= nil
+		or string.find(lower, "groupdoor", 1, true) ~= nil
+end
+
 local function findLockedBuilding(instance)
 	local parent = instance
 	while parent do
@@ -100,34 +110,63 @@ local function findLockedBuilding(instance)
 	return nil
 end
 
-function MapService.BreakWindow(target)
+local function findBreakableWindow(target)
 	local window = target
 	while window and window ~= workspace do
-		if window:GetAttribute("ZurichBreakableWindow") then break end
+		if window:GetAttribute("ZurichBreakableWindow") then return window end
 		window = window.Parent
 	end
-	if not window or not window:GetAttribute("ZurichBreakableWindow") then return false end
-	if window:GetAttribute("ZurichBroken") then return true end
+	return nil
+end
+
+local function getWindowParts(window)
+	local parts = {}
+	if window:IsA("BasePart") then table.insert(parts, window) end
+	for _, object in window:GetDescendants() do
+		if object:IsA("BasePart") then table.insert(parts, object) end
+	end
+	return parts
+end
+
+local function updateWindowVisual(window, health)
+	local maximum = window:GetAttribute("ZurichWindowMaxHealth") or 3
+	local damageRatio = math.clamp((maximum - health) / maximum, 0, 1)
+	for _, part in getWindowParts(window) do
+		local original = part:GetAttribute("ZurichWindowOriginalTransparency") or 0
+		local transparency = health <= 0 and 1 or math.min(0.9, original + damageRatio * 0.65)
+		TweenService:Create(part, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Transparency = transparency,
+		}):Play()
+	end
+end
+
+function MapService.DamageWindow(target, amount)
+	local window = findBreakableWindow(target)
+	if not window then return nil end
+	if window:GetAttribute("ZurichBroken") then return true, 0 end
+	local maximum = window:GetAttribute("ZurichWindowMaxHealth") or 3
+	local health = math.max(0, (window:GetAttribute("ZurichWindowHealth") or maximum) - math.max(1, amount or 1))
+	window:SetAttribute("ZurichWindowHealth", health)
+	if health > 0 then
+		updateWindowVisual(window, health)
+		return false, health
+	end
+
 	window:SetAttribute("ZurichBroken", true)
-	if window:IsA("BasePart") then
-		window.CanCollide = false
-		window.CanQuery = false
-		window.Transparency = 1
+	for _, part in getWindowParts(window) do
+		part.CanCollide = false
+		part.CanQuery = false
 	end
 	for _, object in window:GetDescendants() do
-		if object:IsA("BasePart") then
-			object.CanCollide = false
-			object.CanQuery = false
-			object.Transparency = 1
-		end
 		if object:IsA("ProximityPrompt") and object.Name == "ZurichWindowPrompt" then
 			object.Enabled = false
 		end
 	end
-	return true
+	updateWindowVisual(window, 0)
+	return true, 0
 end
 
-local function configureDoor(promptParent, parts, locked)
+local function configureDoor(promptParent, parts, locked, doorObject)
 	if not promptParent or #parts == 0 or promptParent:FindFirstChild("ZurichDoorPrompt") then return false end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "ZurichDoorPrompt"
@@ -146,26 +185,66 @@ local function configureDoor(promptParent, parts, locked)
 	end
 
 	local original = {}
+	local relative = {}
+	local closedPivot = doorObject:IsA("Model") and doorObject:GetPivot() or nil
 	for _, part in parts do
-		original[part] = {
-			CanCollide = part.CanCollide,
-			Transparency = part.Transparency,
-		}
+		original[part] = { CanCollide = part.CanCollide }
+		if closedPivot then relative[part] = closedPivot:ToObjectSpace(part.CFrame) end
 	end
 	local open = false
+	local busy = false
+	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+	local function targetCFrames(isOpen)
+		local targets = {}
+		if doorObject:IsA("Model") then
+			local openPivot
+			if isGateName(doorObject.Name) then
+				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
+				openPivot = closedPivot * CFrame.new(0, height, 0)
+			else
+				openPivot = closedPivot * CFrame.Angles(0, math.rad(88), 0)
+			end
+			for part, relativeCFrame in relative do
+				targets[part] = isOpen and openPivot * relativeCFrame or closedPivot * relativeCFrame
+			end
+		else
+			local part = parts[1]
+			local closedCFrame = part.CFrame
+			local target = closedCFrame
+			if isOpen and isGateName(doorObject.Name) then
+				target = closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
+			elseif isOpen then
+				target = closedCFrame * CFrame.Angles(0, math.rad(88), 0)
+			end
+			targets[part] = target
+		end
+		return targets
+	end
+
 	prompt.Triggered:Connect(function()
+		if busy then return end
+		busy = true
 		open = not open
-		for part, state in original do
+		local targets = targetCFrames(open)
+		for part, target in targets do
 			if part.Parent then
-				part.CanCollide = open and false or state.CanCollide
-				part.Transparency = open and math.max(state.Transparency, 0.35) or state.Transparency
+				if open then part.CanCollide = false end
+				TweenService:Create(part, tweenInfo, { CFrame = target }):Play()
 			end
 		end
 		prompt.ActionText = open and "Schließen" or "Öffnen"
+		task.delay(0.4, function()
+			if not open then
+				for part, state in original do
+					if part.Parent then part.CanCollide = state.CanCollide end
+				end
+			end
+			busy = false
+		end)
 	end)
 	return true
 end
-
 local function configureDoors(world)
 	if not world then return end
 	local configured = 0
@@ -188,7 +267,7 @@ local function configureDoors(world)
 					if part:IsA("BasePart") then table.insert(parts, part) end
 				end
 				local locked = findLockedBuilding(object) ~= nil
-				if root and #parts > 0 and configureDoor(root, parts, locked) then
+				if root and #parts > 0 and configureDoor(root, parts, locked, object) then
 					configuredModels[object] = true
 					configured += 1
 				end
@@ -200,7 +279,7 @@ local function configureDoors(world)
 		if object:IsA("BasePart") and isDoorName(object.Name) then
 			local parentModel = object:FindFirstAncestorOfClass("Model")
 			if not parentModel or not configuredModels[parentModel] then
-				if configureDoor(object, { object }, findLockedBuilding(object) ~= nil) then configured += 1 end
+				if configureDoor(object, { object }, findLockedBuilding(object) ~= nil, object) then configured += 1 end
 			end
 		end
 	end
@@ -213,28 +292,32 @@ local function configureBreakableWindows(world)
 	if not world then return end
 	local configured = 0
 	for _, object in world:GetDescendants() do
-		if object:IsA("Model") and string.lower(object.Name) == "window" and findLockedBuilding(object) then
+		if object:IsA("Model") and string.lower(object.Name) == "window" then
 			local root = object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true)
 			if root and not root:FindFirstChild("ZurichWindowPrompt") then
+				local maximum = 3
 				object:SetAttribute("ZurichBreakableWindow", true)
-				local parts = {}
-				for _, part in object:GetDescendants() do
-					if part:IsA("BasePart") then
-						part:SetAttribute("ZurichBreakableWindow", true)
-						table.insert(parts, part)
-					end
+				object:SetAttribute("ZurichWindowMaxHealth", maximum)
+				object:SetAttribute("ZurichWindowHealth", maximum)
+				for _, part in getWindowParts(object) do
+					part:SetAttribute("ZurichBreakableWindow", true)
+					part:SetAttribute("ZurichWindowOriginalTransparency", part.Transparency)
 				end
 				local prompt = Instance.new("ProximityPrompt")
 				prompt.Name = "ZurichWindowPrompt"
-				prompt.ActionText = "Einschlagen"
+				prompt.ActionText = "Einschlagen (3)"
 				prompt.ObjectText = "Verriegeltes Fenster"
 				prompt.HoldDuration = 0.35
 				prompt.MaxActivationDistance = 8
 				prompt.RequiresLineOfSight = false
 				prompt.Parent = root
 				prompt.Triggered:Connect(function(player)
-					if MapService.BreakWindow(object) then
+					local broken, remaining = MapService.DamageWindow(object, 1)
+					if broken then
 						notify(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
+					elseif remaining then
+						prompt.ActionText = "Einschlagen (" .. remaining .. ")"
+						notify(player, "GLAS BESCHÄDIGT  ·  NOCH " .. remaining .. " TREFFER", "Info")
 					end
 				end)
 				configured += 1
