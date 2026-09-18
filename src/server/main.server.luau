@@ -62,6 +62,10 @@ shootEvent.OnServerEvent:Connect(function(player, origin, direction)
 	if player:GetAttribute("RedDotOwned") then range += 45 end
 	local result = workspace:Raycast(origin, direction.Unit * range, params)
 	if result then
+		if MapService.BreakWindow(result.Instance) then
+			remotes.Notify:FireClient(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
+			return
+		end
 		local model = result.Instance:FindFirstAncestorOfClass("Model")
 		local humanoid = model and model:FindFirstChildOfClass("Humanoid")
 		if humanoid and model.Name == "Zombie" and humanoid.Health > 0 then

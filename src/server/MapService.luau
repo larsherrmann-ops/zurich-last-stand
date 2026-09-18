@@ -1,4 +1,5 @@
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ModelService = require(script.Parent.ModelService)
 
 local MapService = {}
@@ -69,6 +70,18 @@ local function collectSpawnPositions(world)
 	return positions
 end
 
+local LOCKED_BUILDINGS = {
+	["tall apartments"] = true,
+	["apartment building"] = true,
+	["ramombuilding"] = true,
+}
+
+local function notify(player, message, kind)
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local event = remotes and remotes:FindFirstChild("Notify")
+	if event then event:FireClient(player, message, kind or "Info") end
+end
+
 local function isDoorName(name)
 	local lower = string.lower(name)
 	local hasDoor = string.find(lower, "door", 1, true) ~= nil or string.find(lower, "screen", 1, true) ~= nil
@@ -76,16 +89,61 @@ local function isDoorName(name)
 	return hasDoor and not isNumber
 end
 
-local function configureDoor(promptParent, parts)
+local function findLockedBuilding(instance)
+	local parent = instance
+	while parent do
+		if parent:IsA("Model") and LOCKED_BUILDINGS[string.lower(parent.Name)] then
+			return parent
+		end
+		parent = parent.Parent
+	end
+	return nil
+end
+
+function MapService.BreakWindow(target)
+	local window = target
+	while window and window ~= workspace do
+		if window:GetAttribute("ZurichBreakableWindow") then break end
+		window = window.Parent
+	end
+	if not window or not window:GetAttribute("ZurichBreakableWindow") then return false end
+	if window:GetAttribute("ZurichBroken") then return true end
+	window:SetAttribute("ZurichBroken", true)
+	if window:IsA("BasePart") then
+		window.CanCollide = false
+		window.CanQuery = false
+		window.Transparency = 1
+	end
+	for _, object in window:GetDescendants() do
+		if object:IsA("BasePart") then
+			object.CanCollide = false
+			object.CanQuery = false
+			object.Transparency = 1
+		end
+		if object:IsA("ProximityPrompt") and object.Name == "ZurichWindowPrompt" then
+			object.Enabled = false
+		end
+	end
+	return true
+end
+
+local function configureDoor(promptParent, parts, locked)
 	if not promptParent or #parts == 0 or promptParent:FindFirstChild("ZurichDoorPrompt") then return false end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "ZurichDoorPrompt"
-	prompt.ActionText = "Öffnen"
-	prompt.ObjectText = "Haus-/Ladentür"
+	prompt.ActionText = locked and "Verschlossen" or "Öffnen"
+	prompt.ObjectText = locked and "Wichtiger Eingang" or "Haus-/Ladentür"
 	prompt.HoldDuration = 0.15
 	prompt.MaxActivationDistance = 10
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = promptParent
+
+	if locked then
+		prompt.Triggered:Connect(function(player)
+			notify(player, "EINGANG VERRIEGELT  ·  FENSTER EINSCHLAGEN", "Info")
+		end)
+		return true
+	end
 
 	local original = {}
 	for _, part in parts do
@@ -129,7 +187,8 @@ local function configureDoors(world)
 				for _, part in object:GetDescendants() do
 					if part:IsA("BasePart") then table.insert(parts, part) end
 				end
-				if root and #parts > 0 and configureDoor(root, parts) then
+				local locked = findLockedBuilding(object) ~= nil
+				if root and #parts > 0 and configureDoor(root, parts, locked) then
 					configuredModels[object] = true
 					configured += 1
 				end
@@ -141,12 +200,49 @@ local function configureDoors(world)
 		if object:IsA("BasePart") and isDoorName(object.Name) then
 			local parentModel = object:FindFirstAncestorOfClass("Model")
 			if not parentModel or not configuredModels[parentModel] then
-				if configureDoor(object, { object }) then configured += 1 end
+				if configureDoor(object, { object }, findLockedBuilding(object) ~= nil) then configured += 1 end
 			end
 		end
 	end
 	if configured > 0 then
 		print("ZurichLastStand: configured " .. configured .. " interactive doors")
+	end
+end
+
+local function configureBreakableWindows(world)
+	if not world then return end
+	local configured = 0
+	for _, object in world:GetDescendants() do
+		if object:IsA("Model") and string.lower(object.Name) == "window" and findLockedBuilding(object) then
+			local root = object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true)
+			if root and not root:FindFirstChild("ZurichWindowPrompt") then
+				object:SetAttribute("ZurichBreakableWindow", true)
+				local parts = {}
+				for _, part in object:GetDescendants() do
+					if part:IsA("BasePart") then
+						part:SetAttribute("ZurichBreakableWindow", true)
+						table.insert(parts, part)
+					end
+				end
+				local prompt = Instance.new("ProximityPrompt")
+				prompt.Name = "ZurichWindowPrompt"
+				prompt.ActionText = "Einschlagen"
+				prompt.ObjectText = "Verriegeltes Fenster"
+				prompt.HoldDuration = 0.35
+				prompt.MaxActivationDistance = 8
+				prompt.RequiresLineOfSight = false
+				prompt.Parent = root
+				prompt.Triggered:Connect(function(player)
+					if MapService.BreakWindow(object) then
+						notify(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
+					end
+				end)
+				configured += 1
+			end
+		end
+	end
+	if configured > 0 then
+		print("ZurichLastStand: configured " .. configured .. " breakable windows")
 	end
 end
 local function createRuntimeObjects(map, world, positions)
@@ -201,6 +297,7 @@ local function createRuntimeObjects(map, world, positions)
 	local safehouse = createPoint(map, "SafehouseSpawn", positions[1])
 	safehouse:SetAttribute("Description", "Startpunkt in der Bronx River City")
 	configureDoors(world)
+	configureBreakableWindows(world)
 end
 
 local function createFallbackWorld(map)
