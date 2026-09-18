@@ -21,6 +21,7 @@ return {
 	},
 	Zombie = {
 		MaxActive = 40,
+		-- Fallback-Werte, falls eine Variante keine eigenen mitbringt.
 		Health = 100,
 		WalkSpeed = 9,
 		NightSpeed = 14,
@@ -28,6 +29,59 @@ return {
 		AttackDistance = 5,
 		AttackDelay = 0.8,
 		SpawnDelay = 2.7,
+		--[[ Rigs aus dem Creator Store. Alle gratis und im Inventar des
+		     Place-Owners, damit InsertService:LoadAsset auch im veröffentlichten
+		     Spiel funktioniert. Scripts werden beim Laden entfernt
+		     (siehe ZombieModels.luau). ]]
+		Variants = {
+			{
+				Name = "Walker",
+				AssetId = 187789986, -- Drooling Zombie (@Roblox)
+				Weight = 50,
+				Health = 100,
+				WalkSpeed = 9,
+				NightSpeed = 14,
+				Damage = 10,
+			},
+			{
+				Name = "Runner",
+				AssetId = 3924238625, -- Drooling Zombie Rthro (@Roblox)
+				Weight = 26,
+				Health = 85,
+				WalkSpeed = 13,
+				NightSpeed = 19,
+				Damage = 8,
+			},
+			{
+				Name = "Brute",
+				AssetId = 5038317529, -- Tank Zombie (@trevle0ck)
+				Weight = 13,
+				Health = 260,
+				WalkSpeed = 7,
+				NightSpeed = 9,
+				Damage = 22,
+			},
+			{
+				Name = "Crawler",
+				AssetId = 2791914892, -- A Zombie. [Enemy] (@Burger_MeaI)
+				Weight = 9,
+				Health = 70,
+				WalkSpeed = 11,
+				NightSpeed = 16,
+				Damage = 7,
+			},
+			{
+				Name = "FrostBoss",
+				AssetId = 12128443490, -- Frost Boss Zombie (@safulla202020)
+				Weight = 2,
+				Health = 900,
+				WalkSpeed = 8,
+				NightSpeed = 11,
+				Damage = 34,
+				MaxActive = 1,
+				NightOnly = true,
+			},
+		},
 	},
 	Cycle = {
 		DaySeconds = 70,

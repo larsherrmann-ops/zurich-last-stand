@@ -60,3 +60,22 @@ rojo build -o ZurichLastStand.rbxlx
 ```
 
 Gameplay-Änderungen werden in Roblox Studio getestet. Multiplayer bitte unter **Test → Start** mit mindestens zwei Spielern prüfen.
+
+## Zombie-Varianten
+
+Die Zombies sind echte Rigs aus dem Creator Store (alle gratis, im Inventar des
+Place-Owners). `ZombieModels.luau` lädt sie per `InsertService:LoadAsset`,
+**löscht dabei jedes mitgelieferte Script** und behält nur Rig, Meshes und
+Animations-IDs. Die KI läuft vollständig über `ZombieService.luau`.
+
+| Variante | Asset | ID | Gewicht | HP | Schaden |
+|---|---|---|---|---|---|
+| Walker | Drooling Zombie (@Roblox) | 187789986 | 50 | 100 | 10 |
+| Runner | Drooling Zombie Rthro (@Roblox) | 3924238625 | 26 | 85 | 8 |
+| Brute | Tank Zombie (@trevle0ck) | 5038317529 | 13 | 260 | 22 |
+| Crawler | A Zombie. [Enemy] (@Burger_MeaI) | 2791914892 | 9 | 70 | 7 |
+| FrostBoss | Frost Boss Zombie (@safulla202020) | 12128443490 | 2 | 900 | 34 |
+
+FrostBoss spawnt nur nachts und maximal einmal gleichzeitig. Ist ein Asset nicht
+ladbar, fällt der Service auf den alten Klotz-Zombie zurück, statt gar keinen
+Gegner zu spawnen. Konfiguration: `Config.Zombie.Variants`.

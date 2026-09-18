@@ -186,16 +186,34 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 
 	local original = {}
 	local relative = {}
+	local closedParts = {}
 	local closedPivot = doorObject:IsA("Model") and doorObject:GetPivot() or nil
 	for _, part in parts do
 		original[part] = { CanCollide = part.CanCollide }
+		closedParts[part] = part.CFrame
 		if closedPivot then relative[part] = closedPivot:ToObjectSpace(part.CFrame) end
 	end
 	local open = false
 	local busy = false
+	local activeOpenDirection = Vector3.new(0, 0, -1)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-	local function targetCFrames(isOpen)
+	local function getOpenDirection(player)
+		local character = player and player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local direction = humanoid and humanoid.MoveDirection or Vector3.zero
+		if direction.Magnitude < 0.1 and root then direction = root.CFrame.LookVector end
+		direction = Vector3.new(direction.X, 0, direction.Z)
+		if direction.Magnitude < 0.1 then return activeOpenDirection end
+		return direction.Unit
+	end
+
+	local function translatedCFrame(cframe, direction, distance)
+		return CFrame.new(cframe.Position + direction * distance) * cframe.Rotation
+	end
+
+	local function targetCFrames(isOpen, openDirection)
 		local targets = {}
 		if doorObject:IsA("Model") then
 			local openPivot
@@ -203,30 +221,33 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 				local height = math.max(doorObject:GetExtentsSize().Y, 4) + 0.25
 				openPivot = closedPivot * CFrame.new(0, height, 0)
 			else
-				openPivot = closedPivot * CFrame.Angles(0, math.rad(88), 0)
+				local distance = math.max(doorObject:GetExtentsSize().X, doorObject:GetExtentsSize().Z, 3) + 1
+				openPivot = translatedCFrame(closedPivot, openDirection or activeOpenDirection, distance)
 			end
 			for part, relativeCFrame in relative do
 				targets[part] = isOpen and openPivot * relativeCFrame or closedPivot * relativeCFrame
 			end
 		else
 			local part = parts[1]
-			local closedCFrame = part.CFrame
+			local closedCFrame = closedParts[part]
 			local target = closedCFrame
 			if isOpen and isGateName(doorObject.Name) then
 				target = closedCFrame * CFrame.new(0, math.max(part.Size.Y, 4) + 0.25, 0)
 			elseif isOpen then
-				target = closedCFrame * CFrame.Angles(0, math.rad(88), 0)
+				local distance = math.max(part.Size.X, part.Size.Z, 3) + 1
+				target = translatedCFrame(closedCFrame, openDirection or activeOpenDirection, distance)
 			end
 			targets[part] = target
 		end
 		return targets
 	end
 
-	prompt.Triggered:Connect(function()
+	prompt.Triggered:Connect(function(player)
 		if busy then return end
 		busy = true
 		open = not open
-		local targets = targetCFrames(open)
+		if open then activeOpenDirection = getOpenDirection(player) end
+		local targets = targetCFrames(open, activeOpenDirection)
 		for part, target in targets do
 			if part.Parent then
 				if open then part.CanCollide = false end
@@ -383,6 +404,18 @@ local function createRuntimeObjects(map, world, positions)
 	configureBreakableWindows(world)
 end
 
+local function createCityGround(map)
+	local ground = Instance.new("Part")
+	ground.Name = "CityGround"
+	ground.Size = Vector3.new(2400, 1, 2400)
+	ground.Position = Vector3.new(0, -0.55, 0)
+	ground.Anchored = true
+	ground.Material = Enum.Material.Concrete
+	ground.Color = Color3.fromRGB(76, 81, 86)
+	ground.TopSurface = Enum.SurfaceType.Smooth
+	ground.BottomSurface = Enum.SurfaceType.Smooth
+	ground.Parent = map
+end
 local function createFallbackWorld(map)
 	local ground = Instance.new("Part")
 	ground.Name = "FallbackGround"
@@ -407,6 +440,8 @@ function MapService.Create()
 	if not world then
 		warn("ZurichLastStand: Bronx River City base place is not open; using fallback ground")
 		createFallbackWorld(map)
+	else
+		createCityGround(map)
 	end
 	createRuntimeObjects(map, world, positions)
 	return map
