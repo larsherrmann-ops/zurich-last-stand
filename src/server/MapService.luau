@@ -69,30 +69,79 @@ local function collectSpawnPositions(world)
 	return positions
 end
 
+local function isDoorName(name)
+	local lower = string.lower(name)
+	local hasDoor = string.find(lower, "door", 1, true) ~= nil or string.find(lower, "screen", 1, true) ~= nil
+	local isNumber = string.find(lower, "number", 1, true) ~= nil
+	return hasDoor and not isNumber
+end
+
+local function configureDoor(promptParent, parts)
+	if not promptParent or #parts == 0 or promptParent:FindFirstChild("ZurichDoorPrompt") then return false end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "ZurichDoorPrompt"
+	prompt.ActionText = "Öffnen"
+	prompt.ObjectText = "Haus-/Ladentür"
+	prompt.HoldDuration = 0.15
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = promptParent
+
+	local original = {}
+	for _, part in parts do
+		original[part] = {
+			CanCollide = part.CanCollide,
+			Transparency = part.Transparency,
+		}
+	end
+	local open = false
+	prompt.Triggered:Connect(function()
+		open = not open
+		for part, state in original do
+			if part.Parent then
+				part.CanCollide = open and false or state.CanCollide
+				part.Transparency = open and math.max(state.Transparency, 0.35) or state.Transparency
+			end
+		end
+		prompt.ActionText = open and "Schließen" or "Öffnen"
+	end)
+	return true
+end
+
 local function configureDoors(world)
 	if not world then return end
 	local configured = 0
+	local configuredModels = {}
 	for _, object in world:GetDescendants() do
-		if object:IsA("BasePart") and string.find(string.lower(object.Name), "door", 1, true) then
-			if not object:FindFirstChild("ZurichDoorPrompt") then
-				local prompt = Instance.new("ProximityPrompt")
-				prompt.Name = "ZurichDoorPrompt"
-				prompt.ActionText = "Öffnen / Schließen"
-				prompt.ObjectText = "Tür"
-				prompt.HoldDuration = 0.15
-				prompt.MaxActivationDistance = 9
-				prompt.RequiresLineOfSight = false
-				prompt.Parent = object
-				local closedCFrame = object.CFrame
-				local closedTransparency = object.Transparency
-				local open = false
-				prompt.Triggered:Connect(function()
-					open = not open
-					object.CFrame = open and (closedCFrame * CFrame.Angles(0, math.rad(88), 0)) or closedCFrame
-					object.CanCollide = not open
-					object.Transparency = open and math.max(closedTransparency, 0.35) or closedTransparency
-				end)
-				configured += 1
+		if object:IsA("Model") and isDoorName(object.Name) then
+			local parent = object.Parent
+			local nestedDoor = false
+			while parent and parent ~= world do
+				if parent:IsA("Model") and isDoorName(parent.Name) then
+					nestedDoor = true
+					break
+				end
+				parent = parent.Parent
+			end
+			if not nestedDoor then
+				local root = object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart", true)
+				local parts = {}
+				for _, part in object:GetDescendants() do
+					if part:IsA("BasePart") then table.insert(parts, part) end
+				end
+				if root and #parts > 0 and configureDoor(root, parts) then
+					configuredModels[object] = true
+					configured += 1
+				end
+			end
+		end
+	end
+
+	for _, object in world:GetDescendants() do
+		if object:IsA("BasePart") and isDoorName(object.Name) then
+			local parentModel = object:FindFirstAncestorOfClass("Model")
+			if not parentModel or not configuredModels[parentModel] then
+				if configureDoor(object, { object }) then configured += 1 end
 			end
 		end
 	end
@@ -100,7 +149,6 @@ local function configureDoors(world)
 		print("ZurichLastStand: configured " .. configured .. " interactive doors")
 	end
 end
-
 local function createRuntimeObjects(map, world, positions)
 	map:SetAttribute("MapSource", "FREE Bronx River City Roblox Realistic Roleplay Map")
 	map:SetAttribute("MapEditable", true)
