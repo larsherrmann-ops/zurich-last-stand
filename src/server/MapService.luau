@@ -1,3 +1,5 @@
+local ModelService = require(script.Parent.ModelService)
+
 local MapService = {}
 
 local function part(parent, name, size, position, color, material)
@@ -77,6 +79,12 @@ function MapService.Create()
 		point.Transparency = 1
 		point.CanCollide = false
 	end
+
+	local traders = Instance.new("Folder")
+	traders.Name = "Traders"
+	traders.Parent = map
+	ModelService.CreateTrader(traders, "Marta  ·  HB-Händlerin", Vector3.new(-145, 1, -225), Color3.fromRGB(137, 57, 49))
+	ModelService.CreateTrader(traders, "Noah  ·  Bellevue-Händler", Vector3.new(92, 1, 160), Color3.fromRGB(48, 86, 103))
 	return map
 end
 

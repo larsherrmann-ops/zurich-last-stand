@@ -2,26 +2,31 @@
 
 Ein kooperatives Zombie-Survival-Spiel in einer stilisierten Roblox-Version von Zürich. Spieler sammeln Loot, bauen Barrikaden und überleben nachts stärkere Zombie-Horden.
 
-## Spielbare V1
+## Spielbarer Prototyp
 
 - Zürich-Testmap mit HB, Bahnhofstrasse, Langstrasse, ETH, Bellevue und Zürichsee
-- Multiplayer-Grundlage, Zombies, serverseitiges Schiessen und Loot
-- Barrikaden mit `E`, Tag/Nacht und HUD
+- Server-seitige Schüsse, Zombies, Loot, Barrikaden und Tag/Nacht
+- HUD mit Leben, Munition, Material, Kills und Nachtbanner
+- Multiplayer-Grundlage über Roblox Players und RemoteEvents
 
 ## Start mit Rojo
 
-Installiere Roblox Studio, VS Code, Rojo 7.5+ und das Rojo-Studio-Plugin.
+In diesem Checkout liegt das eigentliche Roblox-Projekt im Unterordner `zurich-last-stand`:
 
 ```powershell
-cd C:\Users\lars_\zurich-last-stand
+cd C:\Users\lars_\zurich-last-stand\zurich-last-stand
 rojo serve
 ```
 
-Roblox Studio öffnen, eine leere Baseplate erstellen, im Rojo-Plugin mit `localhost:34872` verbinden und **Play** drücken. Alternativ:
+Roblox Studio öffnen, eine leere Baseplate erstellen, das Rojo-Plugin über **Plugins → Rojo** öffnen und mit `localhost:34872` verbinden. Danach **Play** drücken und Fehler unter **View → Output** kontrollieren.
+
+Zum Erzeugen einer testbaren Roblox-Datei:
 
 ```powershell
 rojo build -o ZurichLastStand.rbxlx
 ```
+
+Der Build wurde lokal mit Rojo 7.7.0 erfolgreich erzeugt.
 
 ## Steuerung
 
@@ -35,12 +40,11 @@ rojo build -o ZurichLastStand.rbxlx
 ```text
 ├── default.project.json
 ├── rokit.toml
-├── AGENTS.md / CODEX.md / .codex/
-├── docs/
+├── AGENTS.md / CODEX.md
 └── src/
     ├── shared/Config.luau
     ├── server/*.luau
     └── client/main.client.luau
 ```
 
-Codex erkennt die Projektregeln und Agenten beim Öffnen automatisch. Gameplay-Änderungen immer in Roblox Studio testen; Multiplayer unter **Test → Start** mit mindestens zwei Spielern.
+Gameplay-Änderungen werden in Roblox Studio getestet. Multiplayer bitte unter **Test → Start** mit mindestens zwei Spielern prüfen.
