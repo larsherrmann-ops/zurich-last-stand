@@ -225,7 +225,6 @@ local function createLighting()
 	Lighting.Brightness = 2.4
 	Lighting.Ambient = Color3.fromRGB(145, 165, 181)
 	Lighting.OutdoorAmbient = Color3.fromRGB(128, 153, 178)
-	Lighting.Technology = Enum.Technology.Future
 	for _, child in Lighting:GetChildren() do
 		if child.Name == "CityAtmosphere" or child.Name == "CityColor" then child:Destroy() end
 	end

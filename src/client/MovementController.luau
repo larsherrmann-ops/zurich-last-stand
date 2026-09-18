@@ -59,7 +59,6 @@ function MovementController.Start(playerConfig)
 	player.CameraMode = Enum.CameraMode.Classic
 	player.CameraMinZoomDistance = config.CameraMinZoomDistance
 	player.CameraMaxZoomDistance = config.CameraMaxZoomDistance
-	player.DevEnableMouseLock = true
 
 	ContextActionService:BindActionAtPriority(
 		"Sprint",
