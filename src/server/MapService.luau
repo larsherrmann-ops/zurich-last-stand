@@ -95,8 +95,7 @@ end
 
 local function isDoubleDoorName(name)
 	local lower = string.lower(name)
-	return string.find(lower, "stoordoor", 1, true) ~= nil
-		or string.find(lower, "storedoor", 1, true) ~= nil
+	return lower == "storedoors"
 		or string.find(lower, "groupdoor", 1, true) ~= nil
 		or string.find(lower, "double", 1, true) ~= nil
 end
@@ -290,7 +289,10 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 	prompt.Parent = promptParent
 
 	if locked then
-		for _, part in parts do part.CanCollide = true end
+		for _, part in parts do
+			part.Anchored = true
+			part.CanCollide = true
+		end
 		prompt.Triggered:Connect(function(player)
 			notify(player, "EINGANG VERRIEGELT  ·  FENSTER EINSCHLAGEN", "Info")
 		end)
@@ -306,17 +308,73 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 			CanCollide = part.CanCollide,
 			CanTouch = part.CanTouch,
 			CanQuery = part.CanQuery,
+			Anchored = part.Anchored,
 		}
 		closedParts[part] = part.CFrame
 		if closedPivot then
 			relativeParts[part] = closedPivot:ToObjectSpace(part.CFrame)
 		end
+		part.Anchored = true
+	end
+
+	local boundsCFrame
+	local boundsSize
+	if doorObject:IsA("Model") then
+		boundsCFrame, boundsSize = doorObject:GetBoundingBox()
+	else
+		boundsCFrame = closedParts[parts[1]]
+		boundsSize = parts[1].Size
+	end
+
+	local widthAxis
+	local depthAxis
+	local widthSize
+	if boundsSize.X >= boundsSize.Z then
+		widthAxis = Vector3.new(boundsCFrame.RightVector.X, 0, boundsCFrame.RightVector.Z)
+		depthAxis = Vector3.new(boundsCFrame.LookVector.X, 0, boundsCFrame.LookVector.Z)
+		widthSize = boundsSize.X
+	else
+		widthAxis = Vector3.new(boundsCFrame.LookVector.X, 0, boundsCFrame.LookVector.Z)
+		depthAxis = Vector3.new(boundsCFrame.RightVector.X, 0, boundsCFrame.RightVector.Z)
+		widthSize = boundsSize.Z
+	end
+	if widthAxis.Magnitude < 0.1 then widthAxis = Vector3.new(1, 0, 0) end
+	if depthAxis.Magnitude < 0.1 then depthAxis = Vector3.new(0, 0, 1) end
+	widthAxis = widthAxis.Unit
+	depthAxis = depthAxis.Unit
+
+	local function transformAroundHinge(cframe, hingePosition, angle)
+		return CFrame.new(hingePosition)
+			* CFrame.Angles(0, angle, 0)
+			* CFrame.new(-hingePosition)
+			* cframe
+	end
+
+	local function getHingePosition(sideSign)
+		return boundsCFrame.Position + widthAxis * (widthSize * 0.5 * sideSign)
+	end
+
+	local function getOpenState(player)
+		local character = player and player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local right = root and Vector3.new(root.CFrame.RightVector.X, 0, root.CFrame.RightVector.Z)
+		if not right or right.Magnitude < 0.1 then right = widthAxis end
+		right = right.Unit
+
+		local hingeSide = widthAxis:Dot(right) >= 0 and -1 or 1
+		local hingePosition = getHingePosition(hingeSide)
+		local freeEdge = -widthAxis * hingeSide
+		local playerSide = root and (root.Position - boundsCFrame.Position):Dot(depthAxis) or 1
+		local outward = playerSide >= 0 and depthAxis or -depthAxis
+		local positive = CFrame.Angles(0, math.rad(90), 0):VectorToWorldSpace(freeEdge)
+		local angle = positive:Dot(outward) >= 0 and math.rad(90) or math.rad(-90)
+		return hingePosition, angle
 	end
 
 	local open = false
 	local busy = false
-	local activeOpenAngle = math.rad(-90)
-	local activeRightDirection = Vector3.new(1, 0, 0)
+	local activeHingePosition = getHingePosition(-1)
+	local activeOpenAngle = math.rad(90)
 	local tweenInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local pivotDriver
 	local doubleDoor = doorObject:IsA("Model") and isDoubleDoorName(doorObject.Name)
@@ -324,8 +382,9 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 
 	if doubleDoor then
 		local groups = { left = {}, right = {} }
+		local localWidthAxis = closedPivot:VectorToObjectSpace(widthAxis)
 		for part, relative in relativeParts do
-			local side = relative.Position.X <= 0 and "left" or "right"
+			local side = relative.Position:Dot(localWidthAxis) <= 0 and "left" or "right"
 			table.insert(groups[side], { Part = part, Relative = relative })
 		end
 		for side, group in groups do
@@ -360,49 +419,14 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		end
 	end
 
-	local function getOpenDirection(player)
-		local character = player and player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		local fallback = closedPivot and closedPivot.RightVector or closedParts[parts[1]].RightVector
-		if not root then
-			return Vector3.new(fallback.X, 0, fallback.Z).Unit
-		end
-		local right = Vector3.new(root.CFrame.RightVector.X, 0, root.CFrame.RightVector.Z)
-		if right.Magnitude < 0.1 then
-			right = Vector3.new(fallback.X, 0, fallback.Z)
-		end
-		return right.Unit
-	end
-
-	local function getOpenAngle(player)
-		local right = getOpenDirection(player)
-		local doorRight = closedPivot and Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z) or right
-		if doorRight.Magnitude < 0.1 then return math.rad(-90) end
-		return right:Dot(doorRight.Unit) >= 0 and math.rad(-90) or math.rad(90)
-	end
-
-	local function makeOpenTarget(cframe, size, rightDirection, angle)
-		local distance = math.max(size.X, size.Z, 3) + 1.5
-		local position = cframe.Position + rightDirection * distance
-		return CFrame.new(position) * cframe.Rotation * CFrame.Angles(0, angle, 0)
-	end
-
-	local function playDoor(isOpen, openAngle, rightDirection)
+	local function playDoor(isOpen, hingePosition, openAngle)
 		if doubleDoor then
-			local doorRight = Vector3.new(closedPivot.RightVector.X, 0, closedPivot.RightVector.Z)
-			if doorRight.Magnitude < 0.1 then doorRight = Vector3.new(1, 0, 0) end
-			doorRight = doorRight.Unit
-			local size = doorObject:GetExtentsSize()
-			local distance = math.max(size.X, size.Z, 3) + 1.5
-
 			for side, driver in doubleDrivers do
-				local sideSign = side == "left" and -1 or 1
-				local angle = side == "left" and math.rad(90) or math.rad(-90)
 				local target = closedPivot
 				if isOpen then
-					target = CFrame.new(closedPivot.Position + doorRight * sideSign * distance)
-						* closedPivot.Rotation
-						* CFrame.Angles(0, angle, 0)
+					local sideSign = side == "left" and -1 or 1
+					local angle = side == "left" and math.rad(90) or math.rad(-90)
+					target = transformAroundHinge(closedPivot, getHingePosition(sideSign), angle)
 				end
 				TweenService:Create(driver, tweenInfo, { Value = target }):Play()
 			end
@@ -412,7 +436,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		if doorObject:IsA("Model") then
 			local target = closedPivot
 			if isOpen then
-				target = makeOpenTarget(closedPivot, doorObject:GetExtentsSize(), rightDirection, openAngle)
+				target = transformAroundHinge(closedPivot, hingePosition, openAngle)
 			end
 			TweenService:Create(pivotDriver, tweenInfo, { Value = target }):Play()
 			return
@@ -421,7 +445,7 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		local part = parts[1]
 		local target = closedParts[part]
 		if isOpen then
-			target = makeOpenTarget(closedParts[part], part.Size, rightDirection, openAngle)
+			target = transformAroundHinge(closedParts[part], hingePosition, openAngle)
 		end
 		if part.Parent then TweenService:Create(part, tweenInfo, { CFrame = target }):Play() end
 	end
@@ -433,12 +457,11 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		busy = true
 		open = not open
 		if open then
-			activeRightDirection = getOpenDirection(player)
-			activeOpenAngle = getOpenAngle(player)
+			activeHingePosition, activeOpenAngle = getOpenState(player)
 			setDoorCollision(true)
 		end
 
-		playDoor(open, activeOpenAngle, activeRightDirection)
+		playDoor(open, activeHingePosition, activeOpenAngle)
 		prompt.ActionText = open and "Schließen" or "Öffnen"
 		task.delay(0.45, function()
 			if not open then setDoorCollision(false) end
@@ -456,7 +479,9 @@ local function configureDoors(world)
 			local parent = object.Parent
 			local nestedDoor = false
 			while parent and parent ~= world do
-				if parent:IsA("Model") and isDoorName(parent.Name) then
+				if parent:IsA("Model")
+					and isDoorName(parent.Name)
+					and parent:FindFirstChildWhichIsA("BasePart") then
 					nestedDoor = true
 					break
 				end
