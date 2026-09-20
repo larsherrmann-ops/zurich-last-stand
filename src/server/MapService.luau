@@ -365,7 +365,8 @@ local function configureDoor(promptParent, parts, locked, doorObject)
 		local hingePosition = getHingePosition(hingeSide)
 		local freeEdge = -widthAxis * hingeSide
 		local playerSide = root and (root.Position - boundsCFrame.Position):Dot(depthAxis) or 1
-		local outward = playerSide >= 0 and depthAxis or -depthAxis
+		-- Swing away from the player into the building, keeping the doorway clear.
+		local outward = playerSide >= 0 and -depthAxis or depthAxis
 		local positive = CFrame.Angles(0, math.rad(90), 0):VectorToWorldSpace(freeEdge)
 		local angle = positive:Dot(outward) >= 0 and math.rad(90) or math.rad(-90)
 		return hingePosition, angle
