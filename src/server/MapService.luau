@@ -516,6 +516,219 @@ local function configureDoors(world)
 	end
 end
 
+local BUILDING_NAME_HINTS = {
+	"house",
+	"building",
+	"apartment",
+	"store",
+	"shop",
+	"streetstores",
+	"wingstop",
+	"corner store",
+	"ramom",
+	"random building",
+}
+
+local function isBuildingName(name)
+	local lower = string.lower(name)
+	if string.find(lower, "rack", 1, true)
+		or string.find(lower, "cover", 1, true)
+		or string.find(lower, "door", 1, true)
+		or string.find(lower, "window", 1, true) then
+		return false
+	end
+	for _, hint in BUILDING_NAME_HINTS do
+		if string.find(lower, hint, 1, true) then return true end
+	end
+	return false
+end
+
+local function countBuildingParts(building)
+	local count = 0
+	for _, object in building:GetDescendants() do
+		if object:IsA("BasePart") then count += 1 end
+	end
+	return count
+end
+
+local function hasConfiguredDoor(building)
+	for _, object in building:GetDescendants() do
+		if object:IsA("ProximityPrompt") and object.Name == "ZurichDoorPrompt" then
+			return true
+		end
+	end
+	return false
+end
+
+local function createInteriorPart(parent, name, size, cframe, color, material, transparency)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.CFrame = cframe
+	part.Anchored = true
+	part.CanCollide = true
+	part.CanTouch = false
+	part.CanQuery = true
+	part.Color = color
+	part.Material = material
+	part.Transparency = transparency or 0
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Parent = parent
+	return part
+end
+
+local function createFallbackInterior(building, accessFolder)
+	local boundsCFrame, boundsSize = building:GetBoundingBox()
+	local normal
+	local buildingDepth
+	if boundsSize.X <= boundsSize.Z then
+		normal = Vector3.new(boundsCFrame.RightVector.X, 0, boundsCFrame.RightVector.Z)
+		buildingDepth = boundsSize.X
+	else
+		normal = Vector3.new(boundsCFrame.LookVector.X, 0, boundsCFrame.LookVector.Z)
+		buildingDepth = boundsSize.Z
+	end
+	if normal.Magnitude < 0.1 then normal = Vector3.new(0, 0, 1) end
+	normal = normal.Unit
+
+	local roomWidth = math.clamp(math.max(boundsSize.X, boundsSize.Z) * 0.55, 10, 26)
+	local roomDepth = math.clamp(buildingDepth * 0.8, 8, 20)
+	local floorY = math.max(-2, boundsCFrame.Position.Y - boundsSize.Y * 0.5 + 0.25)
+	local roomCenter = boundsCFrame.Position - normal * math.max(0, buildingDepth * 0.5 - roomDepth * 0.5 - 0.75)
+	roomCenter = Vector3.new(roomCenter.X, floorY + 4, roomCenter.Z)
+	local roomFrame = CFrame.lookAt(roomCenter, roomCenter + normal, Vector3.new(0, 1, 0))
+	local roomFolder = Instance.new("Model")
+	roomFolder.Name = "Interior_" .. building.Name
+	roomFolder:SetAttribute("ZurichGeneratedInterior", true)
+	roomFolder.Parent = accessFolder
+
+	local interiorColor = Color3.fromRGB(132, 104, 78)
+	local wallColor = Color3.fromRGB(88, 91, 96)
+	createInteriorPart(roomFolder, "Floor", Vector3.new(roomWidth, 0.4, roomDepth),
+		roomFrame * CFrame.new(0, -4, 0), interiorColor, Enum.Material.WoodPlanks)
+	createInteriorPart(roomFolder, "Ceiling", Vector3.new(roomWidth, 0.35, roomDepth),
+		roomFrame * CFrame.new(0, 4, 0), wallColor, Enum.Material.Concrete)
+
+	local sideWallSize = Vector3.new(0.35, 8, roomDepth)
+	createInteriorPart(roomFolder, "LeftWall", sideWallSize,
+		roomFrame * CFrame.new(-roomWidth * 0.5, 0, 0), wallColor, Enum.Material.Concrete)
+	createInteriorPart(roomFolder, "RightWall", sideWallSize,
+		roomFrame * CFrame.new(roomWidth * 0.5, 0, 0), wallColor, Enum.Material.Concrete)
+	createInteriorPart(roomFolder, "BackWall", Vector3.new(roomWidth, 8, 0.35),
+		roomFrame * CFrame.new(0, 0, -roomDepth * 0.5), wallColor, Enum.Material.Concrete)
+	local frontWallWidth = math.max(0, (roomWidth - 5) * 0.5)
+	createInteriorPart(roomFolder, "FrontWallLeft", Vector3.new(frontWallWidth, 8, 0.35),
+		roomFrame * CFrame.new(-(frontWallWidth + 5) * 0.5, 0, roomDepth * 0.5), wallColor, Enum.Material.Concrete)
+	createInteriorPart(roomFolder, "FrontWallRight", Vector3.new(frontWallWidth, 8, 0.35),
+		roomFrame * CFrame.new((frontWallWidth + 5) * 0.5, 0, roomDepth * 0.5), wallColor, Enum.Material.Concrete)
+
+	local outsidePosition = boundsCFrame.Position + normal * (buildingDepth * 0.5 + 1.25)
+	outsidePosition = Vector3.new(outsidePosition.X, floorY + 3, outsidePosition.Z)
+	local doorModel = Instance.new("Model")
+	doorModel.Name = "GeneratedHouseDoor"
+	doorModel:SetAttribute("ZurichGeneratedDoor", true)
+	doorModel.Parent = accessFolder
+	local doorPart = Instance.new("Part")
+	doorPart.Name = "DoorLeaf"
+	doorPart.Size = Vector3.new(5, 6, 0.35)
+	local doorFrame = CFrame.lookAt(outsidePosition, outsidePosition + normal, Vector3.new(0, 1, 0))
+	doorPart.CFrame = doorFrame
+	doorPart.Anchored = true
+	doorPart.CanCollide = true
+	doorPart.Color = Color3.fromRGB(104, 62, 36)
+	doorPart.Material = Enum.Material.WoodPlanks
+	doorPart.Parent = doorModel
+	createInteriorPart(doorModel, "FrameLeft", Vector3.new(0.35, 7, 0.7),
+		doorFrame * CFrame.new(-2.5, 0, 0), Color3.fromRGB(65, 67, 70), Enum.Material.Concrete)
+	createInteriorPart(doorModel, "FrameRight", Vector3.new(0.35, 7, 0.7),
+		doorFrame * CFrame.new(2.5, 0, 0), Color3.fromRGB(65, 67, 70), Enum.Material.Concrete)
+	createInteriorPart(doorModel, "FrameTop", Vector3.new(5.35, 0.35, 0.7),
+		doorFrame * CFrame.new(0, 3.35, 0), Color3.fromRGB(65, 67, 70), Enum.Material.Concrete)
+
+	configureDoor(doorPart, { doorPart }, false, doorPart)
+	local doorPrompt = doorPart:FindFirstChild("ZurichDoorPrompt")
+	local insidePosition = roomCenter - normal * (roomDepth * 0.5 - 2)
+	local insideCFrame = CFrame.lookAt(insidePosition, insidePosition + normal, Vector3.new(0, 1, 0))
+	local outsideCFrame = CFrame.lookAt(outsidePosition + normal * 2, outsidePosition + normal * 3, Vector3.new(0, 1, 0))
+	if doorPrompt then
+		doorPrompt.ActionText = "Betreten"
+		doorPrompt.Triggered:Connect(function(player)
+			task.delay(0.42, function()
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				if root and doorModel.Parent then root.CFrame = insideCFrame end
+			end)
+		end)
+	end
+
+	local exitPart = Instance.new("Part")
+	exitPart.Name = "InteriorExit"
+	exitPart.Size = Vector3.new(4, 5, 1)
+	exitPart.CFrame = insideCFrame
+	exitPart.Transparency = 1
+	exitPart.Anchored = true
+	exitPart.CanCollide = false
+	exitPart.CanTouch = false
+	exitPart.CanQuery = false
+	exitPart.Parent = roomFolder
+	local exitPrompt = Instance.new("ProximityPrompt")
+	exitPrompt.Name = "ZurichInteriorExitPrompt"
+	exitPrompt.ActionText = "Hinausgehen"
+	exitPrompt.ObjectText = "Ausgang"
+	exitPrompt.HoldDuration = 0.15
+	exitPrompt.MaxActivationDistance = 8
+	exitPrompt.RequiresLineOfSight = false
+	exitPrompt.Parent = exitPart
+	exitPrompt.Triggered:Connect(function(player)
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root then root.CFrame = outsideCFrame end
+	end)
+
+	local light = Instance.new("PointLight")
+	light.Name = "InteriorLight"
+	light.Brightness = 1.6
+	light.Range = 18
+	light.Color = Color3.fromRGB(255, 220, 170)
+	light.Parent = exitPart
+	return true
+end
+
+local function configureBuildingAccess(map, world)
+	if not world then return end
+	local accessFolder = Instance.new("Folder")
+	accessFolder.Name = "GeneratedBuildingAccess"
+	accessFolder.Parent = map
+	local buildings = {}
+	local generated = 0
+
+	for _, object in world:GetDescendants() do
+		if object:IsA("Model") and isBuildingName(object.Name) and countBuildingParts(object) >= 20 then
+			local nestedBuilding = false
+			local parent = object.Parent
+			while parent and parent ~= world do
+				if parent:IsA("Model") and isBuildingName(parent.Name) then
+					nestedBuilding = true
+					break
+				end
+				parent = parent.Parent
+			end
+			if not nestedBuilding then table.insert(buildings, object) end
+		end
+	end
+
+	for _, building in buildings do
+		if not findLockedBuilding(building) and not hasConfiguredDoor(building) then
+			if createFallbackInterior(building, accessFolder) then
+				generated += 1
+			end
+		end
+	end
+	if generated > 0 then
+		print("ZurichLastStand: generated " .. generated .. " enterable building interiors")
+	end
+end
 local function isBreakableWindowName(name)
 	local lower = string.lower(name)
 	if lower == "window" or lower == "glass" or lower == "glasswindow" or lower == "windowpane" then
@@ -639,6 +852,7 @@ local function createRuntimeObjects(map, world, positions)
 	local safehouse = createPoint(map, "SafehouseSpawn", positions[1])
 	safehouse:SetAttribute("Description", "Startpunkt in der Bronx River City")
 	configureDoors(world)
+	configureBuildingAccess(map, world)
 	configureBreakableWindows(world)
 end
 
