@@ -59,23 +59,49 @@ function ModelService.AttachBackpack(character, tier)
 end
 
 function ModelService.AttachWeapon(character, attributes)
-	local old = character:FindFirstChild("ZurichPistol")
-	if old then old:Destroy() end
+	attributes = attributes or {}
+	for _, name in { "ZurichWeapon", "ZurichPistol" } do
+		local old = character:FindFirstChild(name)
+		if old then old:Destroy() end
+	end
 	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
 	if not hand or not hand:IsA("BasePart") then return end
+
+	local weaponName = attributes.WeaponName or "Pistol"
 	local model = Instance.new("Model")
-	model.Name = "ZurichPistol"
+	model.Name = "ZurichWeapon"
+	model:SetAttribute("WeaponName", weaponName)
 	local handle = part(model, "Handle", Vector3.new(0.35, 0.8, 0.3), CFrame.new(), Color3.fromRGB(31, 35, 35), Enum.Material.Metal)
-	local barrel = part(model, "Barrel", Vector3.new(0.28, 0.28, 1.35), CFrame.new(0, 0.26, -0.7), Color3.fromRGB(130, 135, 129), Enum.Material.Metal)
-	local grip = part(model, "Grip", Vector3.new(0.38, 0.78, 0.34), CFrame.new(0, -0.45, 0.05) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(44, 54, 52), Enum.Material.Plastic)
-	weld(model, handle, barrel)
-	weld(model, handle, grip)
+
+	if weaponName == "Shotgun" then
+		local receiver = part(model, "Receiver", Vector3.new(0.5, 0.48, 0.78), CFrame.new(0, 0.12, 0.05), Color3.fromRGB(42, 45, 42), Enum.Material.Metal)
+		local barrel = part(model, "Barrel", Vector3.new(0.25, 0.25, 2.6), CFrame.new(0, 0.24, -1.25), Color3.fromRGB(111, 116, 108), Enum.Material.Metal)
+		local stock = part(model, "Stock", Vector3.new(0.44, 0.5, 1.0), CFrame.new(0, 0.08, 0.82), Color3.fromRGB(101, 62, 38), Enum.Material.Wood)
+		local pump = part(model, "Pump", Vector3.new(0.38, 0.3, 0.52), CFrame.new(0, -0.02, -0.7), Color3.fromRGB(111, 67, 39), Enum.Material.Wood)
+		local grip = part(model, "Grip", Vector3.new(0.38, 0.78, 0.34), CFrame.new(0, -0.45, 0.05) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(44, 54, 52), Enum.Material.Plastic)
+		for _, child in { receiver, barrel, stock, pump, grip } do weld(model, handle, child) end
+	elseif weaponName == "Rifle" then
+		local receiver = part(model, "Receiver", Vector3.new(0.52, 0.5, 1.08), CFrame.new(0, 0.12, 0.02), Color3.fromRGB(45, 49, 47), Enum.Material.Metal)
+		local barrel = part(model, "Barrel", Vector3.new(0.22, 0.22, 2.7), CFrame.new(0, 0.24, -1.7), Color3.fromRGB(112, 119, 113), Enum.Material.Metal)
+		local stock = part(model, "Stock", Vector3.new(0.44, 0.46, 1.2), CFrame.new(0, 0.08, 1.05), Color3.fromRGB(37, 47, 44), Enum.Material.Plastic)
+		local magazine = part(model, "Magazine", Vector3.new(0.38, 0.72, 0.38), CFrame.new(0, -0.42, -0.2) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(31, 35, 34), Enum.Material.Metal)
+		local grip = part(model, "Grip", Vector3.new(0.36, 0.76, 0.32), CFrame.new(0, -0.45, 0.34) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(33, 42, 39), Enum.Material.Plastic)
+		for _, child in { receiver, barrel, stock, magazine, grip } do weld(model, handle, child) end
+	else
+		local barrel = part(model, "Barrel", Vector3.new(0.28, 0.28, 1.35), CFrame.new(0, 0.26, -0.7), Color3.fromRGB(130, 135, 129), Enum.Material.Metal)
+		local grip = part(model, "Grip", Vector3.new(0.38, 0.78, 0.34), CFrame.new(0, -0.45, 0.05) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(44, 54, 52), Enum.Material.Plastic)
+		weld(model, handle, barrel)
+		weld(model, handle, grip)
+	end
+
+	local sightZ = weaponName == "Pistol" and -0.18 or -0.2
 	if attributes.RedDotOwned then
-		local sight = part(model, "RedDot", Vector3.new(0.16, 0.16, 0.32), CFrame.new(0, 0.45, -0.18), Color3.fromRGB(174, 47, 42), Enum.Material.Neon)
+		local sight = part(model, "RedDot", Vector3.new(0.16, 0.16, 0.32), CFrame.new(0, 0.45, sightZ), Color3.fromRGB(174, 47, 42), Enum.Material.Neon)
 		weld(model, handle, sight)
 	end
 	if attributes.FlashlightOwned then
-		local lightMount = part(model, "FlashlightMount", Vector3.new(0.36, 0.18, 0.36), CFrame.new(0, -0.02, -0.58), Color3.fromRGB(23, 25, 24), Enum.Material.Metal)
+		local mountZ = weaponName == "Pistol" and -0.58 or -1.05
+		local lightMount = part(model, "FlashlightMount", Vector3.new(0.36, 0.18, 0.36), CFrame.new(0, -0.02, mountZ), Color3.fromRGB(23, 25, 24), Enum.Material.Metal)
 		local beam = Instance.new("SpotLight")
 		beam.Name = "FlashlightBeam"
 		beam.Angle = 54
@@ -87,14 +113,14 @@ function ModelService.AttachWeapon(character, attributes)
 		beam.Parent = lightMount
 		weld(model, handle, lightMount)
 	end
+
 	model.PrimaryPart = handle
 	model.Parent = character
 	model:PivotTo(hand.CFrame * CFrame.new(0, -0.08, -0.72) * CFrame.Angles(math.rad(-90), 0, 0))
 	weld(model, hand, handle)
 end
-
 function ModelService.SetFlashlight(character, enabled)
-	local weapon = character and character:FindFirstChild("ZurichPistol")
+	local weapon = character and (character:FindFirstChild("ZurichWeapon") or character:FindFirstChild("ZurichPistol"))
 	local mount = weapon and weapon:FindFirstChild("FlashlightMount")
 	local beam = mount and mount:FindFirstChild("FlashlightBeam")
 	if beam and beam:IsA("SpotLight") then beam.Enabled = enabled end
@@ -168,5 +194,3 @@ function ModelService.CreateLoot(parent, position, lootType, amount, color)
 end
 
 return ModelService
-
-

@@ -208,20 +208,49 @@ local function updateHud()
 	health.Text = string.format("LEBEN  %d / %d", currentHealth, maxHealth)
 	healthFill.Size = UDim2.fromScale(math.clamp(currentHealth / math.max(maxHealth, 1), 0, 1), 1)
 	healthFill.BackgroundColor3 = currentHealth > 35 and colors.red or Color3.fromRGB(225, 126, 71)
+
+	local weaponName = attr("Weapon", "Pistol")
+	local weapon = Config.Weapon.Types[weaponName] or Config.Weapon.Types.Pistol
+	local magazineSize = (weapon.MagazineSize or Config.Weapon.MagazineSize)
+		+ (attr("ExtendedMagOwned", false) and Config.Inventory.Attachments.ExtendedMag.MagazineBonus or 0)
 	local stats = hud:FindFirstChild("Stats")
-	local magazineSize = 9 + (attr("ExtendedMagOwned", false) and 6 or 0)
-if stats then stats.Text = string.format("MAG %d/%d   ·   RESERVE %d   ·   MATERIAL %d   ·   $%d   ·   KILLS %d", attr("Magazine", 0), magazineSize, attr("Ammo", 0), attr("Materials", 0), attr("Cash", 0), attr("Kills", 0)) end
-	loadout.Text = string.format("RUCKSACK %s  ·  %d SLOTS  ·  MEDKIT %d", string.upper(tostring(attr("BackpackTier", "Small"))), attr("BackpackSlots", 6), attr("Medkits", 0))
-itemList.Text = string.format("MEDKIT   x%d\nMUNITION x%d\nMATERIAL x%d", attr("Medkits", 0), attr("Ammo", 0), attr("Materials", 0))
+	if stats then
+		stats.Text = string.format(
+			"%s  ·  MAG %d/%d   ·   RESERVE %d   ·   MATERIAL %d   ·   $%d   ·   KILLS %d",
+			string.upper(weapon.DisplayName or weaponName),
+			attr("Magazine", 0),
+			magazineSize,
+			attr("Ammo", 0),
+			attr("Materials", 0),
+			attr("Cash", 0),
+			attr("Kills", 0)
+		)
+	end
+	loadout.Text = string.format(
+		"RUCKSACK %s  ·  %d SLOTS  ·  MEDKIT %d",
+		string.upper(tostring(attr("BackpackTier", "Small"))),
+		attr("BackpackSlots", 6),
+		attr("Medkits", 0)
+	)
+	itemList.Text = string.format(
+		"WAFFE      %s\nMEDKIT     x%d\nMUNITION   x%d\nMATERIAL   x%d",
+		weapon.DisplayName or weaponName,
+		attr("Medkits", 0),
+		attr("Ammo", 0),
+		attr("Materials", 0)
+	)
 	local attachments = {
 		"Rotpunktvisier   " .. (attr("RedDotOwned", false) and "✓" or "—"),
 		"Erweitertes Mag. " .. (attr("ExtendedMagOwned", false) and "✓" or "—"),
 		"Taschenlampe     " .. (attr("FlashlightOwned", false) and (attr("FlashlightOn", false) and "AN" or "AUS") or "—"),
 	}
 	attachmentList.Text = table.concat(attachments, "\n")
-	backpackInfo.Text = string.format("%s-Rucksack  ·  %d Inventarplätze  ·  B zum Schliessen", tostring(attr("BackpackTier", "Small")), attr("BackpackSlots", 6))
+	backpackInfo.Text = string.format(
+		"%s-Rucksack  ·  %d Inventarplätze  ·  B zum Schliessen",
+		tostring(attr("BackpackTier", "Small")),
+		attr("BackpackSlots", 6)
+	)
 end
-
 local function showBanner(text, color)
 	bannerText.Text = text
 	bannerText.TextColor3 = color or colors.gold
@@ -284,7 +313,7 @@ end)
 
 inventoryState.OnClientEvent:Connect(updateHud)
 
-for _, attribute in { "Ammo", "Materials", "Medkits", "Cash", "Kills", "BackpackTier", "BackpackSlots", "FlashlightOwned", "FlashlightOn", "RedDotOwned", "ExtendedMagOwned" } do
+for _, attribute in { "Weapon", "Ammo", "Materials", "Medkits", "Cash", "Kills", "BackpackTier", "BackpackSlots", "FlashlightOwned", "FlashlightOn", "RedDotOwned", "ExtendedMagOwned" } do
 	player:GetAttributeChangedSignal(attribute):Connect(updateHud)
 end
 
@@ -324,9 +353,3 @@ task.spawn(function()
 		task.wait(0.25)
 	end
 end)
-
-
-
-
-
-

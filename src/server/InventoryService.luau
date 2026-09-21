@@ -20,6 +20,17 @@ local tradeByPlayer = {}
 local backpackOrder = { "Small", "Scout", "Tactical", "Heavy" }
 local productRewards = {}
 
+local function getWeaponConfig(player)
+	local weaponName = player:GetAttribute("Weapon") or "Pistol"
+	return Config.Weapon.Types[weaponName] or Config.Weapon.Types.Pistol
+end
+
+local function getWeaponMagazineSize(player)
+	local size = getWeaponConfig(player).MagazineSize or Config.Weapon.MagazineSize
+	if player:GetAttribute("ExtendedMagOwned") then size += Config.Inventory.Attachments.ExtendedMag.MagazineBonus end
+	return size
+end
+
 local function getStore()
     if dataStoreAttempted then return store end
     dataStoreAttempted = true
@@ -41,7 +52,8 @@ end
 local function setDefaults(player)
 	player:SetAttribute("Cash", Config.Player.StartingCash)
 	player:SetAttribute("Ammo", Config.Player.StartingAmmo)
-	player:SetAttribute("Magazine", Config.Weapon.MagazineSize)
+	player:SetAttribute("Weapon", "Pistol")
+	player:SetAttribute("Magazine", Config.Weapon.Types.Pistol.MagazineSize)
 	player:SetAttribute("Materials", Config.Player.StartingMaterials)
 	player:SetAttribute("Medkits", Config.Player.StartingMedkits)
 	player:SetAttribute("Kills", 0)
@@ -56,6 +68,9 @@ end
 local function applyData(player, data)
 	setDefaults(player)
 	if type(data) ~= "table" then return end
+	if type(data.Weapon) == "string" and Config.Weapon.Types[data.Weapon] then
+		player:SetAttribute("Weapon", data.Weapon)
+	end
 	for _, attribute in { "Cash", "Ammo", "Magazine", "Materials", "Medkits", "Kills" } do
 		if type(data[attribute]) == "number" then player:SetAttribute(attribute, math.max(0, math.floor(data[attribute]))) end
 	end
@@ -70,7 +85,7 @@ end
 
 local function serialize(player)
 	local data = {}
-	for _, attribute in { "Cash", "Ammo", "Magazine", "Materials", "Medkits", "Kills", "BackpackTier", "FlashlightOwned", "RedDotOwned", "ExtendedMagOwned" } do
+	for _, attribute in { "Weapon", "Cash", "Ammo", "Magazine", "Materials", "Medkits", "Kills", "BackpackTier", "FlashlightOwned", "RedDotOwned", "ExtendedMagOwned" } do
 		data[attribute] = player:GetAttribute(attribute)
 	end
 	return data
@@ -101,6 +116,7 @@ local function applyCharacter(player, character)
 	end
 	ModelService.AttachBackpack(character, player:GetAttribute("BackpackTier") or "Small")
 	ModelService.AttachWeapon(character, {
+		WeaponName = player:GetAttribute("Weapon") or "Pistol",
 		FlashlightOwned = player:GetAttribute("FlashlightOwned") == true,
 		FlashlightOn = player:GetAttribute("FlashlightOn") == true,
 		RedDotOwned = player:GetAttribute("RedDotOwned") == true,
@@ -175,7 +191,8 @@ local function buyAttachment(player, attachmentName)
 	player:SetAttribute(attribute, true)
 	if player.Character then
 		ModelService.AttachWeapon(player.Character, {
-			FlashlightOwned = player:GetAttribute("FlashlightOwned") == true,
+			WeaponName = player:GetAttribute("Weapon") or "Pistol",
+		FlashlightOwned = player:GetAttribute("FlashlightOwned") == true,
 			FlashlightOn = player:GetAttribute("FlashlightOn") == true,
 			RedDotOwned = player:GetAttribute("RedDotOwned") == true,
 			ExtendedMagOwned = player:GetAttribute("ExtendedMagOwned") == true,
@@ -219,9 +236,7 @@ local function sellItem(player, itemName)
 end
 
 local function getMagazineSize(player)
-	local size = Config.Weapon.MagazineSize
-	if player:GetAttribute("ExtendedMagOwned") then size += Config.Inventory.Attachments.ExtendedMag.MagazineBonus end
-	return size
+	return getWeaponMagazineSize(player)
 end
 
 local function reload(player)
@@ -265,6 +280,28 @@ function InventoryService.CollectLoot(player, lootType, amount)
 	amount = math.max(1, math.floor(tonumber(amount) or 1))
 	if lootType == "BackpackScout" then
 		upgradeBackpack(player, "Scout", true)
+	elseif lootType == "BackpackTactical" then
+		upgradeBackpack(player, "Tactical", true)
+	elseif lootType == "Shotgun" or lootType == "Rifle" then
+		if Config.Weapon.Types[lootType] then
+			player:SetAttribute("Weapon", lootType)
+			player:SetAttribute("Magazine", getWeaponMagazineSize(player))
+			if player.Character then
+				ModelService.AttachWeapon(player.Character, {
+					WeaponName = lootType,
+					FlashlightOwned = player:GetAttribute("FlashlightOwned") == true,
+					FlashlightOn = player:GetAttribute("FlashlightOn") == true,
+					RedDotOwned = player:GetAttribute("RedDotOwned") == true,
+					ExtendedMagOwned = player:GetAttribute("ExtendedMagOwned") == true,
+				})
+			end
+			notify(player, Config.Weapon.Types[lootType].DisplayName .. " gefunden und ausgerüstet.", "Success")
+			refresh(player)
+		end
+	elseif lootType == "ExtendedMag" then
+		player:SetAttribute("ExtendedMagOwned", true)
+		notify(player, "Erweitertes Magazin gefunden.", "Success")
+		refresh(player)
 	elseif lootType == "RedDot" then
 		player:SetAttribute("RedDotOwned", true)
 		notify(player, "Rotpunktvisier gefunden.", "Success")
@@ -273,6 +310,7 @@ function InventoryService.CollectLoot(player, lootType, amount)
 		player:SetAttribute("FlashlightOwned", true)
 		notify(player, "Taschenlampe gefunden. Mit F einschalten.", "Success")
 		if player.Character then ModelService.AttachWeapon(player.Character, {
+			WeaponName = player:GetAttribute("Weapon") or "Pistol",
 			FlashlightOwned = true,
 			FlashlightOn = player:GetAttribute("FlashlightOn") == true,
 			RedDotOwned = player:GetAttribute("RedDotOwned") == true,

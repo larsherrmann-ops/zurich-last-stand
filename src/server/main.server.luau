@@ -43,47 +43,77 @@ LootService.Start(map, InventoryService.CollectLoot)
 DayNightService.Start(stateEvent, ZombieService.SetNight)
 
 local lastShot = {}
+
+local function getWeaponConfig(player)
+	local weaponName = player:GetAttribute("Weapon") or "Pistol"
+	return Config.Weapon.Types[weaponName] or Config.Weapon.Types.Pistol
+end
+
 shootEvent.OnServerEvent:Connect(function(player, origin, direction)
 	if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" then return end
 	if direction.Magnitude < 0.9 or direction.Magnitude > 2000 then return end
+	local weapon = getWeaponConfig(player)
 	local now = os.clock()
-	if now - (lastShot[player] or 0) < Config.Weapon.FireDelay then return end
+	if now - (lastShot[player] or 0) < (weapon.FireDelay or Config.Weapon.FireDelay) then return end
 	local magazine = player:GetAttribute("Magazine") or 0
-	if magazine <= 0 then remotes.Notify:FireClient(player, "MAGAZIN LEER  ·  R DRÜCKEN", "Info"); return end
+	if magazine <= 0 then
+		remotes.Notify:FireClient(player, "MAGAZIN LEER  ·  R DRÜCKEN", "Info")
+		return
+	end
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not root or (root.Position - origin).Magnitude > 10 then return end
+
 	lastShot[player] = now
 	player:SetAttribute("Magazine", magazine - 1)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { character }
-	local range = Config.Weapon.Range
-	if player:GetAttribute("RedDotOwned") then range += 45 end
-	local result = workspace:Raycast(origin, direction.Unit * range, params)
-	if result then
+	local range = (weapon.Range or Config.Weapon.Range) + (player:GetAttribute("RedDotOwned") and 45 or 0)
+	local baseDirection = direction.Unit
+	local pellets = math.max(1, math.floor(weapon.Pellets or 1))
+	local spread = weapon.Spread or 0
+	local windowMessage
+	for _ = 1, pellets do
+		local shotDirection = baseDirection
+		if spread > 0 then
+			local reference = math.abs(baseDirection.Y) > 0.95 and Vector3.new(0, 0, 1) or Vector3.new(0, 1, 0)
+			local right = baseDirection:Cross(reference).Unit
+			local up = right:Cross(baseDirection).Unit
+			shotDirection = (baseDirection
+				+ right * ((math.random() - 0.5) * spread)
+				+ up * ((math.random() - 0.5) * spread)).Unit
+		end
+
+		local result = workspace:Raycast(origin, shotDirection * range, params)
+		if not result then continue end
 		local windowBroken, windowRemaining = MapService.DamageWindow(result.Instance, 1)
 		if windowRemaining ~= nil then
-			if windowBroken then
-				remotes.Notify:FireClient(player, "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", "Success")
-			else
-				remotes.Notify:FireClient(player, "GLAS BESCHÄDIGT  ·  NOCH " .. windowRemaining .. " TREFFER", "Info")
+			if not windowMessage then
+				if windowBroken then
+					windowMessage = { Text = "FENSTER ZERBROCHEN  ·  ZUGANG OFFEN", Kind = "Success" }
+				else
+					windowMessage = { Text = "GLAS BESCHÄDIGT  ·  NOCH " .. windowRemaining .. " TREFFER", Kind = "Info" }
+				end
 			end
-			return
+			continue
 		end
+
 		local model = result.Instance:FindFirstAncestorOfClass("Model")
 		local humanoid = model and model:FindFirstChildOfClass("Humanoid")
 		if humanoid and model.Name == "Zombie" and humanoid.Health > 0 then
 			local wasAlive = humanoid.Health > 0
-			local damage = Config.Weapon.Damage + (player:GetAttribute("RedDotOwned") and 6 or 0)
-			humanoid:TakeDamage(damage)
+			local redDotBonus = player:GetAttribute("RedDotOwned")
+				and Config.Inventory.Attachments.RedDot.DamageBonus
+				or 0
+			humanoid:TakeDamage((weapon.Damage or Config.Weapon.Damage) + redDotBonus)
 			if wasAlive and humanoid.Health <= 0 then
 				player:SetAttribute("Kills", (player:GetAttribute("Kills") or 0) + 1)
 			end
 		end
 	end
+	if windowMessage then remotes.Notify:FireClient(player, windowMessage.Text, windowMessage.Kind) end
 end)
-
 buildEvent.OnServerEvent:Connect(function(player, targetPosition)
 	if typeof(targetPosition) ~= "Vector3" then return end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")

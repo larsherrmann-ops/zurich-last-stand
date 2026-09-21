@@ -18,6 +18,35 @@ return {
 		Range = 350,
 		FireDelay = 0.18,
 		MagazineSize = 9,
+		Types = {
+			Pistol = {
+				DisplayName = "Pistole",
+				Damage = 34,
+				Range = 350,
+				FireDelay = 0.18,
+				MagazineSize = 9,
+				Pellets = 1,
+				Spread = 0,
+			},
+			Shotgun = {
+				DisplayName = "Schrotflinte",
+				Damage = 15,
+				Range = 180,
+				FireDelay = 0.85,
+				MagazineSize = 6,
+				Pellets = 8,
+				Spread = 0.1,
+			},
+			Rifle = {
+				DisplayName = "Sturmgewehr",
+				Damage = 24,
+				Range = 450,
+				FireDelay = 0.11,
+				MagazineSize = 30,
+				Pellets = 1,
+				Spread = 0.018,
+			},
+		},
 	},
 	Zombie = {
 		MaxActive = 40,
@@ -29,6 +58,10 @@ return {
 		AttackDistance = 5,
 		AttackDelay = 0.8,
 		SpawnDelay = 2.7,
+		HighRiskSpawnChance = 0.72,
+		HighRiskNightSpawnChance = 0.9,
+		HighRiskHealthMultiplier = 1.12,
+		HighRiskDamageMultiplier = 1.15,
 		--[[ Rigs aus dem Creator Store. Alle gratis und im Inventar des
 		     Place-Owners, damit InsertService:LoadAsset auch im veröffentlichten
 		     Spiel funktioniert. Scripts werden beim Laden entfernt
@@ -90,6 +123,19 @@ return {
 	Barricade = {
 		Cost = 2,
 		MaxDistance = 14,
+	},
+	Loot = {
+		HighRisk = {
+			{ Name = "Shotgun", Weight = 10, Amount = 1 },
+			{ Name = "Rifle", Weight = 8, Amount = 1 },
+			{ Name = "RedDot", Weight = 12, Amount = 1 },
+			{ Name = "ExtendedMag", Weight = 10, Amount = 1 },
+			{ Name = "BackpackTactical", Weight = 5, Amount = 1 },
+			{ Name = "Flashlight", Weight = 8, Amount = 1 },
+			{ Name = "Ammo", Weight = 25, Amount = 24 },
+			{ Name = "Medkit", Weight = 12, Amount = 2 },
+			{ Name = "Cash", Weight = 10, Amount = 220 },
+		},
 	},
 	Inventory = {
 		Backpacks = {

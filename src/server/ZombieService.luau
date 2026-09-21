@@ -7,6 +7,7 @@ local ZombieModels = require(script.Parent.ZombieModels)
 local ZombieService = {}
 local folder
 local spawnFolder
+local highRiskSpawnFolder
 local isNight = false
 local lastUpdate = 0
 
@@ -77,10 +78,25 @@ local function pickVariant()
 	return pool[#pool]
 end
 
+local function chooseSpawnPoint()
+	local normalSpawns = spawnFolder and spawnFolder:GetChildren() or {}
+	local highRiskSpawns = highRiskSpawnFolder and highRiskSpawnFolder:GetChildren() or {}
+	if #highRiskSpawns > 0 then
+		local chance = isNight
+			and (Config.Zombie.HighRiskNightSpawnChance or 0.9)
+			or (Config.Zombie.HighRiskSpawnChance or 0.72)
+		if math.random() <= chance then
+			return highRiskSpawns[math.random(1, #highRiskSpawns)], true
+		end
+	end
+	if #normalSpawns == 0 then return nil, false end
+	return normalSpawns[math.random(1, #normalSpawns)], false
+end
+
 function ZombieService.Spawn()
 	if not folder or #folder:GetChildren() >= Config.Zombie.MaxActive then return end
-	local spawns = spawnFolder and spawnFolder:GetChildren() or {}
-	if #spawns == 0 then return end
+	local spawnPoint, isHighRisk = chooseSpawnPoint()
+	if not spawnPoint then return end
 
 	local variant = pickVariant()
 	if not variant then return end
@@ -101,17 +117,20 @@ function ZombieService.Spawn()
 	-- main.server.luau erkennt Treffer über model.Name == "Zombie".
 	model.Name = "Zombie"
 	model:SetAttribute("Variant", variant.Name)
-	model:SetAttribute("Damage", variant.Damage or Config.Zombie.Damage)
+	model:SetAttribute("HighRisk", isHighRisk)
+	local damage = variant.Damage or Config.Zombie.Damage
+	if isHighRisk then damage *= Config.Zombie.HighRiskDamageMultiplier or 1 end
+	model:SetAttribute("Damage", damage)
 	model:SetAttribute("LastAttack", 0)
 
 	local health = variant.Health or Config.Zombie.Health
+	if isHighRisk then health *= Config.Zombie.HighRiskHealthMultiplier or 1 end
 	humanoid.MaxHealth = health
 	humanoid.Health = health
 	humanoid.WalkSpeed = variantSpeed(variant)
 
-	local position = spawns[math.random(1, #spawns)].Position
 	model.Parent = folder
-	model:PivotTo(CFrame.new(position + Vector3.new(0, 3, 0)))
+	model:PivotTo(CFrame.new(spawnPoint.Position + Vector3.new(0, 3, 0)))
 	pcall(function() root:SetNetworkOwner(nil) end)
 
 	local entry = { death = animations and animations.Death }
@@ -168,6 +187,8 @@ function ZombieService.Start(map)
 
 	spawnFolder = map and map:FindFirstChild("ZombieSpawns")
 		or workspace:FindFirstChild("ZurichMap") and workspace.ZurichMap:FindFirstChild("ZombieSpawns")
+	highRiskSpawnFolder = map and map:FindFirstChild("HighRiskZombieSpawns")
+		or workspace:FindFirstChild("ZurichMap") and workspace.ZurichMap:FindFirstChild("HighRiskZombieSpawns")
 
 	RunService.Heartbeat:Connect(function()
 		if os.clock() - lastUpdate < 0.22 then return end

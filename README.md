@@ -8,6 +8,8 @@ Ein kooperatives Zombie-Survival-Spiel in der bereinigten Bronx River City Roblo
 - Server-seitige Schüsse, Zombies, Loot, Barrikaden und Tag/Nacht
 - HUD mit Leben, Munition, Material, Kills und Nachtbanner
 - Rucksack-Upgrades, Taschenlampe, Rotpunktvisier und erweiterbares Magazin
+- Schrotflinte und Sturmgewehr als auffindbare, speicherbare Waffen
+- Grosse Gebäude als Hochrisiko-Zonen mit Premium-Loot und dichterem Zombie-Aufkommen
 - Handel mit NPCs und Multiplayer-Spielerhandel
 - Türen der Map erhalten sichere ProximityPrompts zum Öffnen und Schließen
 
@@ -61,6 +63,15 @@ rojo build -o ZurichLastStand.rbxlx
 
 Gameplay-Änderungen werden in Roblox Studio getestet. Multiplayer bitte unter **Test → Start** mit mindestens zwei Spielern prüfen.
 
+## Hochrisiko-Gebäude
+
+Gebäude mit vielen Bauteilen oder grossen Gebäudenamen werden beim Serverstart als
+ZurichHighRisk markiert. Sie erhalten mehrere unsichtbare Loot-Punkte mit einer
+gewichteten Premium-Tabelle: Schrotflinte, Sturmgewehr, Attachments, Tactical-Rucksack,
+Munition, Medkits und mehr Geld. Gleichzeitig werden dort mehrere Zombie-Punkte erzeugt.
+Tagsüber landen die meisten neuen Zombies in diesen Bereichen, nachts fast alle; ihre
+Lebenspunkte und ihr Schaden sind leicht erhöht. Die Werte stehen in
+Config.Loot.HighRisk und Config.Zombie.
 ## Zombie-Varianten
 
 Die Zombies sind echte Rigs aus dem Creator Store (alle gratis, im Inventar des

@@ -729,6 +729,77 @@ local function configureBuildingAccess(map, world)
 		print("ZurichLastStand: generated " .. generated .. " enterable building interiors")
 	end
 end
+local function configureHighRiskBuildings(map, world)
+	if not map or not world then return end
+	local lootFolder = Instance.new("Folder")
+	lootFolder.Name = "HighRiskLootPoints"
+	lootFolder.Parent = map
+	local zombieFolder = Instance.new("Folder")
+	zombieFolder.Name = "HighRiskZombieSpawns"
+	zombieFolder.Parent = map
+
+	local configured = 0
+	local buildings = {}
+	for _, object in world:GetDescendants() do
+		if object:IsA("Model") and isBuildingName(object.Name) and countBuildingParts(object) >= 20 then
+			local nestedBuilding = false
+			local parent = object.Parent
+			while parent and parent ~= world do
+				if parent:IsA("Model") and isBuildingName(parent.Name) then
+					nestedBuilding = true
+					break
+				end
+				parent = parent.Parent
+			end
+			if not nestedBuilding then table.insert(buildings, object) end
+		end
+	end
+
+	for _, building in buildings do
+		local partCount = countBuildingParts(building)
+		local lower = string.lower(building.Name)
+		local namedLarge = string.find(lower, "apartment", 1, true)
+			or string.find(lower, "streetstores", 1, true)
+			or string.find(lower, "ramom", 1, true)
+			or string.find(lower, "wingstop", 1, true)
+			or string.find(lower, "building", 1, true)
+		if partCount >= 90 or namedLarge then
+			local boundsCFrame, boundsSize = building:GetBoundingBox()
+			local floorY = math.max(-1, boundsCFrame.Position.Y - boundsSize.Y * 0.5 + 2.8)
+			local xStep = math.max(2, math.min(boundsSize.X * 0.22, 18))
+			local zStep = math.max(2, math.min(boundsSize.Z * 0.22, 18))
+			building:SetAttribute("ZurichHighRisk", true)
+			building:SetAttribute("ZurichLootTier", "High")
+			building:SetAttribute("ZurichZombieDensity", 2)
+
+			local lootCount = math.clamp(math.floor(partCount / 80), 3, 8)
+			for index = 1, lootCount do
+				local column = (index - 1) % 3 - 1
+				local row = math.floor((index - 1) / 3) % 3 - 1
+				local localPosition = Vector3.new(column * xStep, floorY - boundsCFrame.Position.Y, row * zStep)
+				local point = createPoint(lootFolder, "HighLoot_" .. configured .. "_" .. index, boundsCFrame:PointToWorldSpace(localPosition))
+				point:SetAttribute("HighRisk", true)
+				point:SetAttribute("LootTier", "High")
+				point:SetAttribute("BuildingName", building.Name)
+			end
+
+			local zombieCount = math.clamp(math.floor(partCount / 55), 5, 12)
+			for index = 1, zombieCount do
+				local column = (index - 1) % 4 - 1.5
+				local row = math.floor((index - 1) / 4) % 3 - 1
+				local localPosition = Vector3.new(column * xStep, floorY - boundsCFrame.Position.Y, row * zStep)
+				local point = createPoint(zombieFolder, "HighZombie_" .. configured .. "_" .. index, boundsCFrame:PointToWorldSpace(localPosition))
+				point:SetAttribute("HighRisk", true)
+				point:SetAttribute("BuildingName", building.Name)
+			end
+			configured += 1
+		end
+	end
+
+	if configured > 0 then
+		print("ZurichLastStand: marked " .. configured .. " high-risk buildings with premium loot and dense zombie spawns")
+	end
+end
 local function isBreakableWindowName(name)
 	local lower = string.lower(name)
 	if lower == "window" or lower == "glass" or lower == "glasswindow" or lower == "windowpane" then
@@ -853,6 +924,7 @@ local function createRuntimeObjects(map, world, positions)
 	safehouse:SetAttribute("Description", "Startpunkt in der Bronx River City")
 	configureDoors(world)
 	configureBuildingAccess(map, world)
+	configureHighRiskBuildings(map, world)
 	configureBreakableWindows(world)
 end
 
