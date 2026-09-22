@@ -9,6 +9,7 @@ Ein kooperatives Zombie-Survival-Spiel in der bereinigten Bronx River City Roblo
 - HUD mit Leben, Munition, Material, Kills und Nachtbanner
 - Rucksack-Upgrades, Taschenlampe, Rotpunktvisier und erweiterbares Magazin
 - Schrotflinte und Sturmgewehr als auffindbare, speicherbare Waffen
+- Sichtbare 3D-Loot-Modelle für Waffen, Munition, Medkits, Rucksäcke, Attachments, Geld und Baumaterial
 - Grosse Gebäude als Hochrisiko-Zonen mit Premium-Loot und dichterem Zombie-Aufkommen
 - Handel mit NPCs und Multiplayer-Spielerhandel
 - Türen der Map erhalten sichere ProximityPrompts zum Öffnen und Schließen

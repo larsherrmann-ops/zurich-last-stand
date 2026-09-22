@@ -164,33 +164,141 @@ function ModelService.CreateTrader(parent, name, position, color)
 	return model
 end
 
+local LOOT_LABELS = {
+	Ammo = "Munition",
+	Materials = "Baumaterial",
+	Medkit = "Medkit",
+	Cash = "Geld",
+	BackpackScout = "Scout-Rucksack",
+	BackpackTactical = "Tactical-Rucksack",
+	RedDot = "Rotpunktvisier",
+	ExtendedMag = "Erweitertes Magazin",
+	Flashlight = "Taschenlampe",
+	Shotgun = "Schrotflinte",
+	Rifle = "Sturmgewehr",
+}
+
+local function pickupPart(model, name, size, position, color, material, shape, rotation)
+	local cframe = CFrame.new(position)
+	if rotation then cframe *= rotation end
+	return part(model, name, size, cframe, color, material, shape)
+end
+
 function ModelService.CreateLoot(parent, position, lootType, amount, color)
 	local model = Instance.new("Model")
 	model.Name = lootType
 	model:SetAttribute("LootType", lootType)
 	model:SetAttribute("Amount", amount)
-	local root = part(model, "Root", Vector3.new(2.8, 1.5, 2.8), CFrame.new(position), color, Enum.Material.WoodPlanks)
-	local accent = part(model, "Accent", Vector3.new(1.9, 0.25, 0.35), CFrame.new(position + Vector3.new(0, 0.8, -0.6)), Color3.fromRGB(236, 206, 132), Enum.Material.Neon)
-	weld(model, root, accent)
+	local basePosition = position + Vector3.new(0, 0.7, 0)
+	local root
+	local components = {}
+
+	local function add(name, size, offset, partColor, material, shape, rotation)
+		local child = pickupPart(model, name, size, basePosition + offset, partColor, material, shape, rotation)
+		table.insert(components, child)
+		if root then weld(model, root, child) end
+		return child
+	end
+
+	local metal = Color3.fromRGB(54, 60, 58)
+	local dark = Color3.fromRGB(25, 31, 30)
+	local wood = Color3.fromRGB(105, 65, 39)
+	local white = Color3.fromRGB(245, 239, 220)
+	local brass = Color3.fromRGB(233, 178, 63)
+
+	if lootType == "Shotgun" or lootType == "Rifle" then
+		root = pickupPart(model, "Root", Vector3.new(0.46, 0.38, 0.52), basePosition, dark, Enum.Material.Metal)
+		local rifle = lootType == "Rifle"
+		local barrelLength = rifle and 4.0 or 3.3
+		add("Receiver", rifle and Vector3.new(0.58, 0.5, 1.0) or Vector3.new(0.56, 0.48, 0.8), Vector3.new(0, 0.12, 0.05), metal, Enum.Material.Metal)
+		add("Barrel", rifle and Vector3.new(0.2, 0.2, barrelLength) or Vector3.new(0.24, 0.24, barrelLength), Vector3.new(0, 0.23, -barrelLength * 0.5), Color3.fromRGB(120, 126, 120), Enum.Material.Metal)
+		add("Stock", rifle and Vector3.new(0.45, 0.44, 1.2) or Vector3.new(0.48, 0.48, 1.0), Vector3.new(0, 0.08, 0.85), rifle and dark or wood, rifle and Enum.Material.Plastic or Enum.Material.Wood)
+		add("Grip", Vector3.new(0.34, 0.78, 0.34), Vector3.new(0, -0.42, 0.25), dark, Enum.Material.Plastic, nil, CFrame.Angles(math.rad(-12), 0, 0))
+		if rifle then
+			add("Magazine", Vector3.new(0.36, 0.72, 0.38), Vector3.new(0, -0.42, -0.2), dark, Enum.Material.Metal, nil, CFrame.Angles(math.rad(-10), 0, 0))
+		else
+			add("Pump", Vector3.new(0.4, 0.3, 0.58), Vector3.new(0, -0.02, -0.72), wood, Enum.Material.Wood)
+		end
+	elseif lootType == "Ammo" then
+		root = pickupPart(model, "Root", Vector3.new(2.4, 1.0, 1.7), basePosition, color, Enum.Material.Metal)
+		add("Lid", Vector3.new(2.2, 0.18, 1.55), Vector3.new(0, 0.58, 0), Color3.fromRGB(45, 65, 53), Enum.Material.Metal)
+		for index = 1, 4 do
+			local x = (index - 2.5) * 0.42
+			add("Round" .. index, Vector3.new(0.18, 0.62, 0.18), Vector3.new(x, 0.92, 0), brass, Enum.Material.Metal, Enum.PartType.Cylinder)
+		end
+	elseif lootType == "Medkit" then
+		root = pickupPart(model, "Root", Vector3.new(2.2, 1.15, 1.55), basePosition, color, Enum.Material.Fabric)
+		add("CrossHorizontal", Vector3.new(1.0, 0.22, 0.12), Vector3.new(0, 0.08, -0.82), white, Enum.Material.Neon)
+		add("CrossVertical", Vector3.new(0.22, 0.82, 0.12), Vector3.new(0, 0.08, -0.82), white, Enum.Material.Neon)
+		add("Handle", Vector3.new(0.7, 0.12, 0.16), Vector3.new(0, 0.67, 0), dark, Enum.Material.Plastic)
+	elseif lootType == "Materials" then
+		root = pickupPart(model, "Root", Vector3.new(2.7, 0.35, 1.3), basePosition, wood, Enum.Material.WoodPlanks)
+		add("Plank1", Vector3.new(2.5, 0.28, 0.35), Vector3.new(0, 0.38, -0.38), Color3.fromRGB(143, 91, 51), Enum.Material.Wood)
+		add("Plank2", Vector3.new(2.5, 0.28, 0.35), Vector3.new(0, 0.68, 0.05), wood, Enum.Material.Wood)
+		add("MetalBar", Vector3.new(2.5, 0.22, 0.22), Vector3.new(0, 0.95, 0.4), Color3.fromRGB(108, 116, 112), Enum.Material.Metal)
+	elseif lootType == "Cash" then
+		root = pickupPart(model, "Root", Vector3.new(1.8, 0.28, 1.15), basePosition, Color3.fromRGB(42, 104, 61), Enum.Material.Fabric)
+		add("Bill1", Vector3.new(1.65, 0.08, 1.0), Vector3.new(0, 0.22, 0), Color3.fromRGB(83, 178, 100), Enum.Material.Fabric)
+		add("Bill2", Vector3.new(1.65, 0.08, 1.0), Vector3.new(0.08, 0.32, 0.03), Color3.fromRGB(71, 157, 88), Enum.Material.Fabric)
+	elseif lootType == "BackpackScout" or lootType == "BackpackTactical" then
+		local tactical = lootType == "BackpackTactical"
+		local bagColor = tactical and Color3.fromRGB(37, 67, 65) or Color3.fromRGB(49, 92, 65)
+		root = pickupPart(model, "Root", tactical and Vector3.new(2.6, 2.8, 1.15) or Vector3.new(2.3, 2.5, 1.0), basePosition, bagColor, Enum.Material.Fabric)
+		add("Flap", Vector3.new(1.9, 0.46, 0.12), Vector3.new(0, 0.83, -0.58), Color3.fromRGB(72, 111, 75), Enum.Material.Fabric)
+		add("Pocket", Vector3.new(1.5, 0.6, 0.18), Vector3.new(0, -0.35, -0.62), Color3.fromRGB(27, 52, 42), Enum.Material.Fabric)
+		add("Strap", Vector3.new(0.16, 1.9, 0.12), Vector3.new(-0.82, 0, -0.58), dark, Enum.Material.Fabric)
+	elseif lootType == "RedDot" then
+		root = pickupPart(model, "Root", Vector3.new(0.9, 0.22, 0.62), basePosition, dark, Enum.Material.Metal)
+		add("Sight", Vector3.new(0.32, 0.3, 0.46), Vector3.new(0, 0.28, 0), Color3.fromRGB(35, 38, 36), Enum.Material.Metal)
+		add("Lens", Vector3.new(0.16, 0.16, 0.16), Vector3.new(0, 0.3, -0.24), Color3.fromRGB(235, 53, 47), Enum.Material.Neon, Enum.PartType.Ball)
+	elseif lootType == "ExtendedMag" then
+		root = pickupPart(model, "Root", Vector3.new(0.5, 1.45, 0.5), basePosition, dark, Enum.Material.Metal, nil, CFrame.Angles(math.rad(-10), 0, 0))
+		add("BasePlate", Vector3.new(0.62, 0.12, 0.58), Vector3.new(0, -0.72, 0), metal, Enum.Material.Metal)
+	elseif lootType == "Flashlight" then
+		root = pickupPart(model, "Root", Vector3.new(0.46, 1.65, 0.46), basePosition, Color3.fromRGB(45, 47, 43), Enum.Material.Metal, Enum.PartType.Cylinder, CFrame.Angles(math.rad(90), 0, 0))
+		add("GripRing", Vector3.new(0.56, 0.12, 0.56), Vector3.new(0, 0, -0.6), metal, Enum.Material.Metal, Enum.PartType.Cylinder, CFrame.Angles(math.rad(90), 0, 0))
+		add("Lens", Vector3.new(0.32, 0.1, 0.32), Vector3.new(0, 0, -0.88), Color3.fromRGB(255, 235, 160), Enum.Material.Neon, Enum.PartType.Cylinder, CFrame.Angles(math.rad(90), 0, 0))
+	else
+		root = pickupPart(model, "Root", Vector3.new(2.8, 1.5, 2.8), basePosition, color, Enum.Material.WoodPlanks)
+		add("Accent", Vector3.new(1.9, 0.25, 0.35), Vector3.new(0, 0.8, -0.6), Color3.fromRGB(236, 206, 132), Enum.Material.Neon)
+	end
+
 	model.PrimaryPart = root
 	model.Parent = parent
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("BasePart") then descendant.Anchored = true end
 	end
+
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "LootPrompt"
 	prompt.ActionText = "Aufnehmen"
-	prompt.ObjectText = lootType
+	prompt.ObjectText = LOOT_LABELS[lootType] or lootType
 	prompt.HoldDuration = 0.15
 	prompt.MaxActivationDistance = 10
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = root
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "LootLabel"
+	billboard.Size = UDim2.fromOffset(150, 26)
+	billboard.StudsOffset = Vector3.new(0, 2.4, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = LOOT_LABELS[lootType] or lootType
+	label.TextColor3 = Color3.fromRGB(242, 232, 207)
+	label.TextStrokeTransparency = 0.35
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.Parent = billboard
+
 	local light = Instance.new("PointLight")
 	light.Color = color
 	light.Range = 7
-	light.Brightness = 0.45
+	light.Brightness = (lootType == "Shotgun" or lootType == "Rifle") and 0.7 or 0.45
 	light.Parent = root
 	return model
 end
-
 return ModelService
