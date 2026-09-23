@@ -13,6 +13,9 @@ Ein kooperatives Zombie-Survival-Spiel in der bereinigten Bronx River City Roblo
 - Grosse Gebäude als Hochrisiko-Zonen mit Premium-Loot und dichterem Zombie-Aufkommen
 - Handel mit NPCs und Multiplayer-Spielerhandel
 - Türen der Map erhalten sichere ProximityPrompts zum Öffnen und Schließen
+- Garagentore fahren beim Öffnen senkrecht nach oben und schließen exakt in ihre Ausgangsposition
+- Leere Eingänge erhalten einen begehbaren Boden, Wände, Licht und einen Ausgang; verriegelte Hochrisiko-Gebäude bleiben nur über zerbrochene Fenster zugänglich
+- Zerbrochene Fenster öffnen einen animierten Durchgang zum Hineinlaufen
 
 ## Start mit Rojo und der Stadt-Map
 

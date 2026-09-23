@@ -1,4 +1,11 @@
 return {
+	Buildings = {
+		InteractionDistance = 10,
+		WindowInteractionDistance = 8,
+		WindowHealth = 3,
+		WindowTransparency = 0.65,
+		WindowHitCooldown = 0.4,
+	},
 	Player = {
 		MaxHealth = 100,
 		WalkSpeed = 18,
