@@ -113,7 +113,7 @@ local function configureDoor(object)
 	prompt.Name = "ZurichDoorPrompt"
 	prompt.ActionText = locked and "Verschlossen" or "Öffnen"
 	prompt.ObjectText = locked and "Wichtiger Eingang" or (garage and "Garagentor" or "Tür")
-	prompt.KeyboardKeyCode = Enum.KeyCode.Q
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.HoldDuration = 0.15
 	prompt.MaxActivationDistance = settings.InteractionDistance
 	prompt.RequiresLineOfSight = false
@@ -318,7 +318,7 @@ local function configureWindow(pane)
 	prompt.Name = "ZurichWindowPrompt"
 	prompt.ActionText = "Einschlagen (" .. settings.WindowHealth .. ")"
 	prompt.ObjectText = "Fenster"
-	prompt.KeyboardKeyCode = Enum.KeyCode.Q
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.HoldDuration = settings.WindowHitCooldown
 	prompt.MaxActivationDistance = settings.WindowInteractionDistance
 	prompt.RequiresLineOfSight = true
